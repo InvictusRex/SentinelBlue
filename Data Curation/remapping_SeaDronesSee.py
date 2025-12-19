@@ -1,9 +1,8 @@
 import os
 import shutil
 
-SRC_DATASET = "../../Datasets/SeaDronesSee"              # SeaDronesSee root
-DST_DATASET = "../../Datasets/SentinelBlue" # New curated dataset
-
+SRC_DATASET = "../../Datasets/SeaDronesSee"              
+DST_DATASET = "../../Datasets/SentinelBlue" 
 SPLITS = ["train", "val", "test"]
 
 # Old SeaDronesSee class IDs -> New SentinelBlue class IDs
