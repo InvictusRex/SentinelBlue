@@ -1,31 +1,34 @@
 # SentinelBlue
 
-Edge-Optimized Deep Learning for Autonomous Maritime Search and Rescue
+**Edge-Optimized Deep Learning for Autonomous Maritime Search and Rescue**
 
 ---
 
 ## Model Selection
 
-SentinelBlue focuses on real-time RGB-based object detection for maritime search-and-rescue scenarios under edge deployment constraints. The following models are used:
+SentinelBlue focuses on real-time RGB-based object detection for maritime search-and-rescue scenarios under strict edge deployment constraints. The following models are evaluated to study accuracy–efficiency trade-offs.
 
 ### Primary Models
 
 - **YOLOv8n**
-
-  - Used as the baseline model
-  - Fast iteration, dataset validation, and early experimentation
-  - Strong edge deployment support
+  - Baseline model for dataset validation and initial experimentation
+  - Fast convergence and stable training behavior
+  - Representative of realistic edge-deployment constraints
 
 - **YOLOv11n**
-  - Main model for final experiments
-  - Better feature extraction and small-object detection
-  - Primary candidate for onboard UAV deployment
+  - Primary model for final experiments
+  - Improved feature extraction and small-object detection
+  - Main candidate for onboard UAV deployment
+
+- **YOLOv26**
+  - Edge-optimized experimental variant
+  - Evaluated for scaling behavior under compute and latency constraints
 
 ### Comparative Model
 
 - **RT-DETR (Light Variant)**
-  - Transformer-based detector
-  - Used for accuracy and architectural comparison
+  - Transformer-based object detector
+  - Used for architectural and accuracy comparison
   - Not intended for edge deployment
 
 All models are trained and evaluated using identical datasets and splits to ensure fair comparison.
@@ -34,7 +37,7 @@ All models are trained and evaluated using identical datasets and splits to ensu
 
 ## Object Classes
 
-The final class taxonomy used across all models is:
+The final object taxonomy used across all models is fixed and SAR-oriented:
 
 - person
 - boat
@@ -47,10 +50,10 @@ The final class taxonomy used across all models is:
 - **person**: Any human detected in water or on floating platforms
 - **boat**: Small to medium watercraft
 - **jetski**: Personal watercraft
-- **buoy**: Floating buoy or lifebuoy
-- **emergency_appliance**: Rescue or flotation equipment (life jackets, rafts, rescue floats, etc.)
+- **buoy**: Floating buoy or lifebuoy-like objects
+- **emergency_appliance**: Rescue and flotation equipment such as life jackets, life rafts, life rings, and throwable rescue devices
 
-This class design prioritizes SAR relevance and minimizes class imbalance by grouping rare rescue equipment.
+Rare rescue equipment is grouped under `emergency_appliance` to improve learnability while preserving SAR semantics.
 
 ---
 
@@ -62,38 +65,41 @@ This class design prioritizes SAR relevance and minimizes class imbalance by gro
 
 ### Supplementary Data
 
-- Additional images are sourced only for underrepresented classes such as:
-  - `buoy`
-  - `emergency_appliance`
+To correct severe class imbalance, external datasets are used **only to augment the training split**, with explicit class remapping and no validation or test contamination.
 
-Supplementary data is restricted to maritime environments to preserve distribution consistency.
+Supplementary datasets are used to reinforce:
+
+- `jetski`
+- `buoy`
+- `emergency_appliance`
+
+All dataset modifications are non-destructive and fully reproducible.
 
 ### Synthetic Data
 
-- Synthetic data generation is applied selectively for rare classes
-- Techniques include object compositing onto water backgrounds with scale, rotation, blur, and lighting variation
-- Synthetic data is capped to avoid domain drift
+- Synthetic data generation is not relied upon as a primary balancing mechanism
+- The dataset is instead strengthened using real-world annotated imagery
+- This avoids domain drift and preserves visual realism
 
 ---
 
 ## Training Strategy
 
 - Identical train/validation/test splits across all models
-- Focus on high recall for the `person` class
-- Monitoring:
-  - Recall
-  - False negatives
-  - Per-class AP
-  - mAP50 / mAP50–95
+- No class-specific tuning or dataset manipulation per model
+- Primary focus on:
+  - Recall for the `person` class
+  - Per-class Average Precision
+  - mAP50 and mAP50–95
 
 ---
 
 ## Edge Optimization
 
-For onboard inference, trained models undergo:
+For onboard UAV inference, trained models are evaluated and optimized using:
 
 - FP16 / INT8 quantization
-- Channel pruning and layer fusion
+- Layer fusion and pruning
 - TensorRT acceleration
 - Benchmarking for:
   - FPS
@@ -107,25 +113,38 @@ For onboard inference, trained models undergo:
 
 SentinelBlue follows a **search-and-report** paradigm:
 
-- UAV performs grid search over incident coordinates
+- UAV performs grid-based search over incident regions
 - Objects are detected onboard in real time
 - Spatial relationships between:
   - persons
   - boats
   - buoys
-  - emergency appliances
+  - emergency appliances  
     are evaluated
-- Detections and metadata are reported to a command center
-- Final validation is performed by a human operator
+- Detections and metadata are transmitted to a command center
+- Final decision-making is performed by a human operator
 
-Pose estimation and autonomous distress classification are intentionally excluded at this stage.
+Autonomous rescue actions and pose-based distress classification are intentionally excluded.
 
 ---
 
 ## Scope
 
-- RGB-only detection (current)
+- RGB-only perception (current)
 - RGB–thermal fusion (planned extension)
 - Fully autonomous rescue actions are out of scope
+
+---
+
+## Documentation
+
+Detailed design and implementation decisions are documented in:
+
+- [`Documentation/Project_Overview.md`](Documentation/Project%20Overview.md)
+- [`Documentation/Model_Selection Strategy.md`](Documentation/Model%20Selection%20Strategy.md)
+- [`Documentation/Class_Taxonomy.md`](Documentation/Class%20Taxonomy.md)
+- [`Documentation/Dataset_Curation.md`](Documentation/Data%20Curation%20Strategy.md)
+
+Additional documentation will be added as training, evaluation, and deployment stages are completed.
 
 ---
