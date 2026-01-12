@@ -1,7 +1,7 @@
 import os
 from collections import defaultdict
 
-DATASET_ROOT = "../../Datasets/sentinelblue"
+DATASET_ROOT = "../Datasets/SentinelBlue"
 SPLITS = ["train", "val", "test"]
 
 CLASS_NAMES = [
@@ -34,7 +34,7 @@ def count_instances():
                     if len(parts) != 5:
                         continue
 
-                    class_id = int(parts[0])
+                    class_id = int(float(parts[0]))
                     if class_id < 0 or class_id >= len(CLASS_NAMES):
                         continue
 
