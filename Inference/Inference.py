@@ -5,7 +5,7 @@ import time
 
 # === CONFIG ===
 MODEL_PATH = r'../Inference/YOLO-28s.pt'                
-VIDEO_PATH = r'../Inference/beach aerial view.mp4'       
+VIDEO_PATH = r'../Inference/swimmers.mp4'       
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # === LOAD MODEL ===
