@@ -1,41 +1,37 @@
 import cv2
 from ultralytics import YOLO
 import torch
-import time
 
-# === CONFIG ===
-MODEL_PATH = r'../Inference/YOLO-28s.pt'                
-VIDEO_PATH = r'../Inference/swimmers.mp4'       
+MODEL_PATH = r'../Models Weights/Small Models/YOLO-28s.pt'                
+VIDEO_PATH = r'../Inference/Test Videos/swimmers.mp4'        
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-# === LOAD MODEL ===
 print(f'Using device: {DEVICE}')
+
 model = YOLO(MODEL_PATH).to(DEVICE)
 
-# === LOAD VIDEO ===
+model.model.names = {
+    0: "boat",                 
+    1: "buoy",                   
+    2: "jetski",                 
+    3: "emergency_appliance",    
+    4: "person"
+}
+
 cap = cv2.VideoCapture(VIDEO_PATH)
 if not cap.isOpened():
     print("Error: Could not open video.")
     exit()
 
-# === MAIN LOOP ===
 while True:
     ret, frame = cap.read()
     if not ret:
         break
-    # Inference
     results = model(frame, device=DEVICE)
-
-    # Draw results
     annotated_frame = results[0].plot()
-
-    # Show frame
-    cv2.imshow("YOLOv8 Detection", annotated_frame)
-
-    # Exit on 'q'
+    cv2.imshow("YOLO Inference", annotated_frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# === CLEANUP ===
 cap.release()
 cv2.destroyAllWindows()
