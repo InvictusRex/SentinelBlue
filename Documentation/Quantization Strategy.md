@@ -1,4 +1,5 @@
-# Model Conversion and Quantization Pipeline  
+# Model Conversion and Quantization Pipeline
+
 ## YOLO (PyTorch) → ONNX → RKNN Compilation for SentinelBlue
 
 ---
@@ -17,8 +18,16 @@ The pipeline is structured as a two-stage transformation system, with ONNX actin
 
 ```mermaid
 flowchart LR
-    A[YOLO Model best.pt] --> B[ONNX Graph Static IR]
-    B --> C[RKNN Model Hardware Graph]
+    A[YOLO Model<br>best.pt] --> B[ONNX Graph<br>Static IR]
+    B --> C[RKNN Compilation<br>Hardware Graph]
+
+    subgraph Stage 1: Framework Export
+        A --> B
+    end
+
+    subgraph Stage 2: Hardware Compilation
+        B --> C
+    end
 ```
 
 This separation ensures that model definition (PyTorch) and execution constraints (RKNN) are decoupled, allowing controlled transformations at each stage.
@@ -43,8 +52,11 @@ The ONNX model is then compiled into RKNN format using the RKNN Toolkit. This st
 flowchart TD
     A[ONNX Graph] --> B[Operator Mapping]
     B --> C[Graph Optimization]
-    C --> D[Quantization]
+    C --> D[Precision Transformation]
     D --> E[RKNN Model]
+
+    B -->|Unsupported Ops Resolved| C
+    C -->|Fusion / Simplification| D
 ```
 
 During this process, operators are mapped to RKNN-supported implementations. Unsupported operations are resolved through decomposition or approximation. The graph is then optimized through layer fusion and simplification to reduce execution overhead and improve efficiency.
