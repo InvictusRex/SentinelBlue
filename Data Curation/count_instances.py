@@ -1,15 +1,8 @@
-from __future__ import annotations
-
 from collections import Counter
 from pathlib import Path
 
 
 CLASS_NAMES = ["person", "vessel", "emergency_appliance"]
-DISPLAY_NAMES = {
-    "person": "person",
-    "vessel": "vessel",
-    "emergency_appliance": "emergencyappliance",
-}
 
 DATA_CURATION_DIR = Path(__file__).resolve().parent
 SENTINELBLUE_GITHUB_DIR = DATA_CURATION_DIR.parent
@@ -52,8 +45,9 @@ def count_split(dataset_root: Path, split_name: str) -> Counter[str]:
 
 def print_counts(title: str, counts: Counter[str]) -> None:
     print(title)
-    for class_name in CLASS_NAMES:
-        print(f"{DISPLAY_NAMES[class_name]}: {counts[class_name]}")
+    print(f"Person: {counts['person']}")
+    print(f"Vessel: {counts['vessel']}")
+    print(f"Emergency_Appliance: {counts['emergency_appliance']}")
 
 
 def main() -> None:

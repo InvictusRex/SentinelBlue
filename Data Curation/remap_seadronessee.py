@@ -1,19 +1,9 @@
-from __future__ import annotations
-
 import argparse
 from collections import Counter
 from pathlib import Path
-from typing import Iterable
 
 
-SOURCE_CLASS_NAMES = [
-    "boat",
-    "buoy",
-    "jetski",
-    "life_saving_appliances",
-    "swimmer",
-]
-
+SOURCE_CLASS_NAMES = ["boat", "buoy", "jetski", "life_saving_appliances", "swimmer"]
 NEW_CLASS_NAMES = ["person", "vessel", "emergency_appliance"]
 
 SOURCE_TO_TARGET_NAME = {
@@ -35,57 +25,32 @@ def default_dataset_root() -> Path:
     return DEFAULT_DATASET_ROOT
 
 
-def candidate_label_dirs(dataset_root: Path) -> list[tuple[str, Path]]:
-    label_dirs: list[tuple[str, Path]] = []
-    for split_name in ("train", "valid", "val", "test"):
-        label_dir = dataset_root / split_name / "labels"
-        if label_dir.is_dir():
-            label_dirs.append((split_name, label_dir))
-    return label_dirs
-
-
 def remap_label_file(label_file: Path) -> Counter[str]:
-    updated_lines: list[str] = []
-    class_counts: Counter[str] = Counter()
+    counts = Counter()
+    remapped_lines = []
 
     for raw_line in label_file.read_text(encoding="utf-8").splitlines():
-        stripped_line = raw_line.strip()
-        if not stripped_line:
-            updated_lines.append("")
+        raw_line = raw_line.strip()
+        if not raw_line:
             continue
 
-        parts = stripped_line.split(maxsplit=1)
-        if not parts:
-            updated_lines.append("")
+        parts = raw_line.split(maxsplit=1)
+        if len(parts) == 0:
             continue
 
-        try:
-            old_class_id = int(parts[0])
-        except ValueError as exc:
-            raise ValueError(f"{label_file}: invalid class id in line: {raw_line!r}") from exc
-
+        old_class_id = int(parts[0])
         if old_class_id < 0 or old_class_id >= len(SOURCE_CLASS_NAMES):
-            raise ValueError(
-                f"{label_file}: class id {old_class_id} is outside the expected SeaDronesSee range"
-            )
+            raise ValueError(f"{label_file}: class id {old_class_id} is outside the expected SeaDronesSee range")
 
         source_name = SOURCE_CLASS_NAMES[old_class_id]
         target_name = SOURCE_TO_TARGET_NAME[source_name]
-        target_class_id = TARGET_NAME_TO_ID[target_name]
-
         remainder = parts[1] if len(parts) > 1 else ""
-        updated_lines.append(f"{target_class_id} {remainder}".rstrip())
-        class_counts[target_name] += 1
 
-    label_file.write_text("\n".join(updated_lines) + ("\n" if updated_lines else ""), encoding="utf-8")
-    return class_counts
+        remapped_lines.append(f"{TARGET_NAME_TO_ID[target_name]} {remainder}".rstrip())
+        counts[target_name] += 1
 
-
-def iter_label_files(label_dirs: Iterable[Path]) -> list[Path]:
-    files: list[Path] = []
-    for label_dir in label_dirs:
-        files.extend(sorted(label_dir.glob("*.txt")))
-    return files
+    label_file.write_text("\n".join(remapped_lines) + ("\n" if remapped_lines else ""), encoding="utf-8")
+    return counts
 
 
 def main() -> None:
@@ -102,7 +67,13 @@ def main() -> None:
     if not dataset_root.is_dir():
         raise FileNotFoundError(f"Dataset root not found: {dataset_root}")
 
-    label_dirs = candidate_label_dirs(dataset_root)
+    splits = ("train", "valid", "val", "test")
+    label_dirs = []
+    for split_name in splits:
+        label_dir = dataset_root / split_name / "labels"
+        if label_dir.is_dir():
+            label_dirs.append((split_name, label_dir))
+
     if not label_dirs:
         raise FileNotFoundError(
             f"No label directories found under {dataset_root}. Expected train/labels, valid/labels, val/labels, or test/labels."
@@ -113,13 +84,13 @@ def main() -> None:
     total_changed = 0
 
     for split_name, label_dir in label_dirs:
-        split_files = iter_label_files([label_dir])
+        split_files = sorted(label_dir.glob("*.txt"))
         if not split_files:
             continue
 
         print(f"Beginning {split_name} split")
 
-        split_counts: Counter[str] = Counter()
+        split_counts = Counter()
         split_changed = 0
 
         for label_file in split_files:
