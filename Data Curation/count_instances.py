@@ -1,57 +1,81 @@
-import os
-from collections import defaultdict
+from __future__ import annotations
 
-DATASET_ROOT = "../../SentinelBlue"
-SPLITS = ["train", "val", "test"]
+from collections import Counter
+from pathlib import Path
 
-CLASS_NAMES = [
-    "person",
-    "vessel",
-    "emergency_appliance",
-]
 
-def count_instances():
-    counts = defaultdict(int)
-    split_counts = {split: defaultdict(int) for split in SPLITS}
-    total_instances = 0
+CLASS_NAMES = ["person", "vessel", "emergency_appliance"]
+DISPLAY_NAMES = {
+    "person": "person",
+    "vessel": "vessel",
+    "emergency_appliance": "emergencyappliance",
+}
 
-    for split in SPLITS:
-        labels_dir = os.path.join(DATASET_ROOT, split, "labels")
+DATA_CURATION_DIR = Path(__file__).resolve().parent
+SENTINELBLUE_GITHUB_DIR = DATA_CURATION_DIR.parent
+DEFAULT_DATASET_ROOT = SENTINELBLUE_GITHUB_DIR.parent / "SentinelBlue"
 
-        if not os.path.isdir(labels_dir):
-            print(f"[WARN] Missing labels dir: {labels_dir}")
+
+def count_label_file(label_file: Path) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for raw_line in label_file.read_text(encoding="utf-8").splitlines():
+        stripped_line = raw_line.strip()
+        if not stripped_line:
             continue
 
-        for label_file in os.listdir(labels_dir):
-            if not label_file.endswith(".txt"):
-                continue
+        parts = stripped_line.split(maxsplit=1)
+        try:
+            class_id = int(parts[0])
+        except ValueError as exc:
+            raise ValueError(f"{label_file}: invalid class id in line: {raw_line!r}") from exc
 
-            with open(os.path.join(labels_dir, label_file), "r") as f:
-                for line in f:
-                    parts = line.strip().split()
-                    if len(parts) != 5:
-                        continue
+        if class_id < 0 or class_id >= len(CLASS_NAMES):
+            raise ValueError(f"{label_file}: class id {class_id} is outside the expected range")
 
-                    class_id = int(float(parts[0]))
-                    if class_id < 0 or class_id >= len(CLASS_NAMES):
-                        continue
+        counts[CLASS_NAMES[class_id]] += 1
 
-                    counts[class_id] += 1
-                    split_counts[split][class_id] += 1
-                    total_instances += 1
+    return counts
 
-    print("\nTOTAL INSTANCE COUNTS")
-    for cid, name in enumerate(CLASS_NAMES):
-        print(f"{name:25s}: {counts[cid]}")
 
-    print("\nSPLIT-WISE COUNTS")
-    for split in SPLITS:
-        print(f"[{split.upper()}]")
-        for cid, name in enumerate(CLASS_NAMES):
-            print(f"{name:25s}: {split_counts[split][cid]}")
+def count_split(dataset_root: Path, split_name: str) -> Counter[str]:
+    label_dir = dataset_root / split_name / "labels"
+    split_counts: Counter[str] = Counter()
+
+    if not label_dir.is_dir():
+        return split_counts
+
+    for label_file in sorted(label_dir.glob("*.txt")):
+        split_counts.update(count_label_file(label_file))
+
+    return split_counts
+
+
+def print_counts(title: str, counts: Counter[str]) -> None:
+    print(title)
+    for class_name in CLASS_NAMES:
+        print(f"{DISPLAY_NAMES[class_name]}: {counts[class_name]}")
+
+
+def main() -> None:
+    dataset_root = DEFAULT_DATASET_ROOT
+    if not dataset_root.is_dir():
+        raise FileNotFoundError(f"Dataset root not found: {dataset_root}")
+
+    split_names = ["train", "valid", "val", "test"]
+    split_counts = {split_name: count_split(dataset_root, split_name) for split_name in split_names}
+
+    total_counts: Counter[str] = Counter()
+    for counts in split_counts.values():
+        total_counts.update(counts)
+
+    print_counts("Total Instances", total_counts)
+
+    for split_name in split_names:
+        if not split_counts[split_name]:
+            continue
         print()
+        print_counts(f"{split_name} Set Instances", split_counts[split_name])
 
-    print(f"TOTAL OBJECT INSTANCES: {total_instances}")
 
 if __name__ == "__main__":
-    count_instances()
+    main()

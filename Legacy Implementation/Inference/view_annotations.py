@@ -6,10 +6,8 @@ SPLIT = "train"   # change to val / test if needed
 
 CLASS_NAMES = [
     "person",
-    "boat",
-    "jetski",
-    "buoy",
-    "emergency_appliance"
+    "vessel",
+    "emergency_appliance",
 ]
 
 IMG_DIR = os.path.join(DATASET_ROOT, SPLIT, "images")
@@ -21,6 +19,10 @@ MAX_WIDTH = 1280
 MAX_HEIGHT = 720
 
 images = sorted([f for f in os.listdir(IMG_DIR) if f.lower().endswith(IMAGE_EXTS)])
+if len(images) == 0:
+    print("ERROR: No images found! Check your DATASET_ROOT and SPLIT paths.")
+    exit()
+    
 idx = 0
 
 def resize_for_display(img):
@@ -81,9 +83,9 @@ while True:
     cv2.imshow("SentinelBlue Viewer", vis)
     key = cv2.waitKey(0) & 0xFF
 
-    if key == ord('n'):
+    if key == ord('n') or key == ord('d'):
         idx = (idx + 1) % len(images)
-    elif key == ord('p'):
+    elif key == ord('p') or key == ord('a'):
         idx = (idx - 1) % len(images)
     elif key == ord('q'):
         break
