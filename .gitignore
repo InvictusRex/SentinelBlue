@@ -1,0 +1,27 @@
+# Ignore video files in Output Videos directory
+Legacy Implementation/Inference/Output Videos/*.mp4
+Legacy Implementation/Inference/Output Videos/*.avi
+Legacy Implementation/Inference/Output Videos/*.mov
+Legacy Implementation/Inference/Output Videos/*.mkv
+Legacy Implementation/Inference/Output Videos/*.flv
+Legacy Implementation/Inference/Output Videos/*.wmv
+Legacy Implementation/Inference/Output Videos/*.webm
+Legacy Implementation/Inference/Output Videos/*.m4v
+Legacy Implementation/Inference/Output Videos/*.mpg
+Legacy Implementation/Inference/Output Videos/*.mpeg
+Legacy Implementation/Inference/Output Videos/*.3gp
+Legacy Implementation/Inference/Output Videos/*.ogv
+
+# Ignore video files in Test Videos directory
+Legacy Implementation/Inference/Test Videos/*.mp4
+Legacy Implementation/Inference/Test Videos/*.avi
+Legacy Implementation/Inference/Test Videos/*.mov
+Legacy Implementation/Inference/Test Videos/*.mkv
+Legacy Implementation/Inference/Test Videos/*.flv
+Legacy Implementation/Inference/Test Videos/*.wmv
+Legacy Implementation/Inference/Test Videos/*.webm
+Legacy Implementation/Inference/Test Videos/*.m4v
+Legacy Implementation/Inference/Test Videos/*.mpg
+Legacy Implementation/Inference/Test Videos/*.mpeg
+Legacy Implementation/Inference/Test Videos/*.3gp
+Legacy Implementation/Inference/Test Videos/*.ogv
