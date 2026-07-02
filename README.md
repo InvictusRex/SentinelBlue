@@ -1,13 +1,11 @@
 # SentinelBlue
 
 <div align="center">
-  <a href="Inference%20Videos/Output%20Videos/multi.mp4">
-    <img src="multi.gif" alt="SentinelBlue Inference Demo" width="100%">
+  <a href="Inference%20Videos/Output%20Videos/multi_compressed.mp4">
+    <img src="cover.gif" alt="SentinelBlue Inference Demo" width="100%"/>
   </a>
-  <br>
-  <strong>Real-Time Maritime Search-and-Rescue (SAR) Perception on RK3588 Edge Hardware</strong>
+  <p><strong>Real-Time Maritime Search-and-Rescue (SAR) Perception on RK3588 Edge Hardware</strong></p>
 </div>
-<br>
 
 SentinelBlue is a maritime Search-and-Rescue (SAR) perception system focused on real-time RGB object detection from UAV viewpoints under embedded compute constraints. Rather than acting as an autonomous rescue controller, SentinelBlue functions as a high-reliability perception and reporting module. Onboard inference produces structured detection evidence, contextualizes maritime SAR cues, and transmits them to the ground station, while all rescue decisions remain human-authorized.
 
