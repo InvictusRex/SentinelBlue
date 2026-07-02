@@ -1,61 +1,95 @@
 # SentinelBlue
 
-SentinelBlue is a maritime search-and-rescue (SAR) perception system focused on real-time RGB detection from UAV viewpoints under embedded compute constraints. The project is intentionally scoped as a high-reliability search-and-report module rather than an autonomous rescue controller: onboard inference produces structured detection evidence, spatially contextualized SAR cues are transmitted to mission control, and final intervention logic remains human-authorized. The technical objective is to identify a defensible accuracy-efficiency operating envelope across six trained YOLO variants (v8/v11/v28 in nano and small scales) while preserving strict dataset integrity and repeatable training conditions.
+**Real-Time Maritime Search-and-Rescue (SAR) Perception on RK3588 Edge Hardware**
+
+<p align="center">
+  <a href="Inference%20Videos/Output%20Videos/multi.mp4">
+    <strong>▶️ Watch SentinelBlue Inference Demo</strong>
+  </a>
+</p>
+
+SentinelBlue is a maritime Search-and-Rescue (SAR) perception system focused on real-time RGB object detection from UAV viewpoints under embedded compute constraints. Rather than acting as an autonomous rescue controller, SentinelBlue functions as a high-reliability perception and reporting module. Onboard inference produces structured detection evidence, contextualizes maritime SAR cues, and transmits them to the ground station, while all rescue decisions remain human-authorized.
+
+The project is designed around a reproducible computer vision pipeline that evaluates multiple YOLO architectures under identical training conditions, deterministic dataset engineering practices, and deployment-oriented optimization for RK3588 NPUs. The primary objective is to identify the most practical balance between detection performance and computational efficiency for real-world maritime SAR missions.
 
 ## Technical Objective
 
-The engineering objective is to maximize operationally relevant detection quality in maritime scenes characterized by sea clutter, glare, wave-induced texture noise, and small-object visibility limits, while maintaining practical deployability on edge hardware. The training and evaluation policy therefore prioritizes: (1) strong recall on mission-critical person detection, (2) robust class discrimination for contextual maritime objects, (3) architecture-fair benchmarking with frozen data semantics, and (4) deterministic conversion and quantization pathways for embedded inference.
+The engineering objectives of SentinelBlue are centered around developing a reliable, deployment-ready maritime SAR perception system that balances detection performance with embedded inference efficiency. The project is specifically designed to:
+
+- Maximize **person detection recall**, ensuring distressed individuals remain the highest-priority detection target.
+- Maintain robust discrimination between **boats, jet skis, buoys, and emergency appliances** despite sea clutter, glare, reflections, and wave-induced texture noise.
+- Benchmark multiple **YOLO architectures (YOLOv8, YOLOv11, and YOLO26)** under identical training conditions to enable fair, architecture-level performance comparisons.
+- Preserve strict **dataset integrity** through deterministic class remapping, frozen validation/testing splits, and reproducible preprocessing pipelines.
+- Develop a deployment pipeline that supports **deterministic ONNX export, INT8 quantization, and RKNN compilation** for RK3588-based embedded hardware.
+- Identify the optimal operating point between **accuracy, computational complexity, and real-time inference performance** for practical UAV-assisted maritime Search-and-Rescue operations.
+
+These objectives establish a reproducible evaluation framework in which improvements are attributable to architecture and optimization rather than uncontrolled dataset variation, while ensuring the final deployment candidate remains suitable for real-world edge execution.
 
 ## System and Data Architecture
 
 ```mermaid
-flowchart TD
-    subgraph S1[Operational Perception Loop]
-        direction TB
-        A1[UAV RGB Stream] --> A2[Frame Preprocessing]
-        A2 --> A3[YOLO Inference]
-        A3 --> A4[NMS and Confidence Filtering]
-        A4 --> A5[Context Layer person-boat-jetski-buoy-emergency_appliance]
-        A5 --> A6[Telemetry and Alert Packet]
-    end
+flowchart TB
 
-    subgraph S2[Dataset Engineering Loop]
-        direction TB
-        B1[SeaDronesSee Base] --> B2[Class Taxonomy Freeze]
-        B2 --> B3[Deterministic Class Remapping]
-        B3 --> B4[Instance-Level Imbalance Audit]
-        B4 --> B5[Targeted Reintroduction and Augmentation]
-        B5 --> B6[Split Lock train-only modification]
-    end
+%% ================= DATASET ENGINEERING =================
+subgraph S2["Dataset Engineering Loop"]
+direction LR
+B1["SeaDronesSee Base"]
+--> B2["Class Taxonomy Freeze"]
+--> B3["Deterministic Class Remapping"]
+--> B4["Instance-Level Imbalance Audit"]
+--> B5["Targeted Reintroduction & Augmentation"]
+--> B6["Split Lock (Train-only Modification)"]
+end
 
-    A6 --> C1[Ground Station Visualization]
-    C1 --> C2[Human-in-the-loop SAR Decision]
-    B6 --> A3
+%% ================= PERCEPTION =================
+subgraph S1["Operational Perception Loop"]
+direction LR
+A1["UAV RGB Stream"]
+--> A2["Frame Preprocessing"]
+--> A3["YOLO Inference"]
+--> A4["NMS & Confidence Filtering"]
+--> A5["SAR Context Layer<br/>Person • Boat • Jetski • Buoy • Emergency Appliance"]
+--> A6["Telemetry & Alert Packet"]
+end
+
+B6 --> A3
+
+A6 --> C1["Ground Station Visualization"]
+C1 --> C2["Human-in-the-Loop SAR Decision"]
 ```
 
-This structure reflects the project philosophy that perception reliability is primarily data-limited in maritime SAR. The system remains conservative by design: no autonomous actuation path is introduced, and model outputs are consumed as mission evidence rather than final rescue actions.
+SentinelBlue is intentionally structured around two tightly coupled workflows. The **Dataset Engineering Loop** establishes a deterministic and reproducible training foundation through taxonomy standardization, class balancing, and controlled augmentation, while the **Operational Perception Loop** performs real-time UAV inference, contextualizes detections, and transmits mission evidence to the ground station.
+
+The system remains deliberately conservative: no autonomous rescue decisions are made onboard. Instead, every detection serves as decision-support evidence for human operators, ensuring that perception reliability and deployment robustness remain the primary objectives of the project.
 
 ## Taxonomy and Class Semantics
 
-SentinelBlue uses a frozen five-class schema applied consistently across curation, training, and evaluation: person, boat, jetski, buoy, and emergency_appliance. The schema is function-centric rather than manufacturer-centric because SAR systems benefit more from actionable semantic grouping than from fine-grained category fragmentation.
+SentinelBlue adopts a **frozen five-class taxonomy** that remains consistent throughout dataset curation, model training, evaluation, and deployment. The taxonomy is intentionally **function-oriented** rather than manufacturer- or appearance-oriented, ensuring that detected objects correspond directly to operationally meaningful SAR entities.
 
-| Class               | Operational role in SAR                                                 |
-| ------------------- | ----------------------------------------------------------------------- |
-| person              | Primary distress target; recall-critical under all operating conditions |
-| boat                | Contextual and potential rescue-agent vessel class                      |
-| jetski              | Distinct high-maneuverability watercraft requiring separation from boat |
-| buoy                | Safety marker and environmental context object                          |
-| emergency_appliance | Functionally grouped flotation and rescue equipment class               |
+| Class | Operational Role in SAR |
+| :--- | :--- |
+| **person** | Primary distress target; highest-priority class with recall-focused optimization |
+| **boat** | Contextual vessel and potential rescue platform |
+| **jetski** | High-maneuverability watercraft requiring discrimination from conventional boats |
+| **buoy** | Environmental marker providing navigational and situational context |
+| **emergency_appliance** | Functionally grouped flotation and rescue equipment used during emergency response |
 
-The emergency_appliance grouping is a deliberate anti-sparsity strategy that consolidates visually diverse but operationally equivalent rescue artifacts, improving learnability without losing SAR relevance.
+The **emergency_appliance** category deliberately consolidates visually diverse but operationally equivalent rescue equipment into a single semantic class. This reduces dataset sparsity, improves class learnability, and preserves the operational significance of rescue-related objects without unnecessarily fragmenting the taxonomy.
 
 ## Data Curation and Augmentation Methodology
 
-The curation policy is dataset-centric and non-destructive. SeaDronesSee is used as the structural anchor, while externally sourced data is introduced only into the training split and only after deterministic remapping to the frozen taxonomy. Validation and test splits are intentionally insulated from augmentation and data injection to prevent optimistic bias in evaluation.
+The dataset engineering strategy is intentionally **dataset-centric, reproducible, and non-destructive**. SeaDronesSee serves as the primary dataset foundation, while carefully selected auxiliary maritime datasets are incorporated **exclusively into the training split** after deterministic remapping to the frozen SentinelBlue taxonomy.
 
-The training-only reintroduction pool is assembled from SeaDronesSee plus targeted auxiliary maritime datasets for jetski, buoy, life-jacket, and life-saving appliance classes, with external split partitions intentionally ignored and only semantically valid SAR labels retained. This enforces strict evaluation hygiene while increasing minority-class density through real annotated imagery rather than synthetic generation.
+To preserve evaluation integrity:
 
-Class imbalance is analyzed strictly at object-instance level rather than image count level, because gradient contribution in detection learning is object-frequency dependent. The resulting post-curation training distribution is intentionally person-dominant and not downsampled, since person detection is mission-critical and broad person diversity improves robustness to lighting, sea-state variation, and background clutter.
+- Validation and test datasets remain completely untouched.
+- External datasets are never introduced into validation or testing.
+- Only semantically compatible SAR labels are retained during remapping.
+- All augmentation is performed exclusively on the training split.
+
+This policy ensures that benchmark results accurately reflect model generalization rather than hidden data leakage or optimistic evaluation bias.
+
+Class imbalance is analyzed at the **object-instance level** instead of the image level, since optimization dynamics in object detection are governed primarily by instance frequency. Rather than downsampling the dominant **person** class, SentinelBlue intentionally preserves its natural prevalence because person detection remains the highest-priority objective in maritime Search-and-Rescue operations.
 
 | Class               | Train instances |
 | ------------------- | --------------: |
@@ -73,106 +107,119 @@ Augmentation is class-conditional and realism-constrained. Jetski and buoy class
 | buoy                | stronger small-object scale bias, mild blur/noise, contrast variation        | Improve low-contrast small-object robustness against water texture       |
 | emergency_appliance | bbox-aware copy-paste + photometric blending                                 | Increase rare rescue-object frequency while preserving SAR scene realism |
 
-The pipeline explicitly avoids heavy geometric distortion, unrealistic flips, aggressive hue shifts, and GAN-based synthesis, because these transformations can degrade maritime semantic realism and cause distribution drift.
+The augmentation pipeline deliberately avoids unrealistic geometric transformations, aggressive color manipulation, excessive viewpoint distortion, and GAN-generated imagery, ensuring that the resulting training distribution remains representative of real-world maritime SAR environments.
 
-## Six-Model Benchmark (Nano and Small)
+## Model Benchmark
 
-All six YOLO models are trained and evaluated under a consistent split policy and common metric suite so that performance differences remain architecture-linked rather than data-linked.
+To identify the most suitable deployment architecture, all candidate models were trained and evaluated under an identical dataset split, augmentation policy, optimization strategy, and evaluation protocol. This controlled benchmarking framework ensures that observed performance differences arise from architectural characteristics rather than variations in data preparation or training methodology.
 
-| Model    | GFLOPs | Precision | Recall | mAP@50 | mAP@50-95 |
-| -------- | ------ | --------: | -----: | -----: | --------: |
-| YOLOv8n  | 8.1    |     0.904 |  0.890 |  0.901 |     0.612 |
-| YOLOv8s  | 28.4   |     0.926 |  0.882 |  0.922 |     0.676 |
-| YOLOv11n | 6.3    |     0.891 |  0.868 |  0.885 |     0.607 |
-| YOLOv11s | 21.3   |     0.912 |  0.862 |  0.907 |     0.667 |
-| YOLOv28n | 5.2    |     0.903 |  0.873 |  0.891 |     0.617 |
-| YOLOv28s | 17.8   |     0.924 |  0.868 |  0.913 |     0.684 |
+| Model | GFLOPs | Precision | Recall | mAP@50 | mAP@50-95 |
+| :--- | ------: | --------: | -----: | -----: | --------: |
+| YOLOv8 | 28.4 | 0.926 | 0.882 | 0.922 | 0.676 |
+| YOLOv11 | 21.3 | 0.912 | 0.862 | 0.907 | 0.667 |
+| YOLO26 | 17.8 | 0.924 | 0.868 | 0.913 | **0.684** |
 
-The benchmark indicates that small variants improve high-IoU performance as expected, while nano variants preserve a stronger efficiency profile. YOLOv28s reaches the strongest aggregate mAP@50-95 in this set, and YOLOv28n offers the lowest GFLOPs footprint with competitive precision/recall, which is operationally attractive for tight edge constraints.
+Among the evaluated architectures, **YOLO26** achieved the highest **mAP@50-95** while also maintaining the lowest computational complexity (GFLOPs) of the three models. **YOLOv8** delivered the highest precision and recall, whereas **YOLOv11** offered competitive performance with a moderate computational footprint.
+
+The benchmark demonstrates that all three architectures provide strong detection capability for maritime SAR scenarios, with the final deployment model selected by balancing detection quality, computational efficiency, and embedded deployment constraints rather than optimizing a single evaluation metric.
 
 ## Model Selection Strategy
 
-Model selection is treated as a constrained optimization problem across detection quality, runtime feasibility, and deployment stability. The strategy first validates dataset and label consistency through lightweight baselines, then evaluates architecture scaling behavior across nano and small variants without class-specific tuning. This ensures that the final deployment candidate is selected from a fair and reproducible comparison surface rather than from model-specific configuration advantages.
+Model selection in SentinelBlue is formulated as a multi-objective optimization problem that balances detection performance, computational efficiency, and deployment feasibility. Rather than selecting a model solely on the basis of accuracy, each architecture is evaluated across multiple criteria relevant to embedded maritime SAR applications.
 
-## Per-Class Detection Profile (Deployment Baseline: YOLOv28n)
+The evaluation process follows a staged methodology:
 
-The table below presents class-level performance for the selected deployment baseline model.
+- Validate dataset integrity and annotation consistency through controlled baseline experiments.
+- Benchmark YOLOv8, YOLOv11, and YOLO26 under identical training conditions.
+- Compare architectures using a unified performance metric suite, including Precision, Recall, mAP@50, mAP@50-95, and computational complexity (GFLOPs).
+- Assess deployment readiness by considering ONNX compatibility, RKNN conversion, and INT8 quantization suitability for RK3588-based edge hardware.
 
-| Class               | Precision | Recall | mAP@50 | mAP@50-95 |
-| ------------------- | --------: | -----: | -----: | --------: |
-| person              |     0.876 |  0.773 |  0.815 |     0.371 |
-| boat                |     0.949 |  0.930 |  0.955 |     0.787 |
-| jetski              |     0.942 |  0.909 |  0.945 |     0.778 |
-| buoy                |     0.879 |  0.866 |  0.836 |     0.567 |
-| emergency_appliance |     0.868 |  0.889 |  0.905 |     0.581 |
+This methodology ensures that the selected deployment model represents the best balance between perception accuracy, computational efficiency, and practical edge deployment, rather than excelling in only a single evaluation metric.
 
-The class profile is consistent with maritime detection difficulty. Boat and jetski are learned strongly due to clearer structural cues, while person remains the hardest class under small-scale presentation and water-induced visual ambiguity. Emergency_appliance reaches useful precision-recall balance despite strong intra-class visual diversity, validating the functional grouping policy used during taxonomy design.
+## Per-Class Detection Profile (Selected Deployment Model: YOLO26)
+
+The table below presents the class-wise performance of the selected **YOLO26** deployment model. Evaluating performance at the class level provides greater insight into operational behavior than aggregate metrics alone, highlighting how detection quality varies across different maritime objects under real-world SAR conditions.
+
+| Class | Precision | Recall | mAP@50 | mAP@50-95 |
+| :--- | --------: | -----: | -----: | --------: |
+| person | 0.876 | 0.773 | 0.815 | 0.371 |
+| boat | 0.949 | 0.930 | 0.955 | 0.787 |
+| jetski | 0.942 | 0.909 | 0.945 | 0.778 |
+| buoy | 0.879 | 0.866 | 0.836 | 0.567 |
+| emergency_appliance | 0.868 | 0.889 | 0.905 | 0.581 |
+
+The class-level results closely reflect the inherent challenges of maritime object detection. **Boat** and **jetski** achieve the strongest overall performance due to their comparatively distinctive structural features and larger object footprints within UAV imagery. In contrast, **person** remains the most challenging class because of its small apparent size, frequent partial occlusions, and reduced visual contrast against dynamic water backgrounds.
+
+Despite exhibiting substantial intra-class appearance variation, the **emergency_appliance** category achieves a balanced precision–recall profile, validating the decision to consolidate multiple rescue-related objects into a single function-oriented semantic class. Overall, the selected YOLO26 model demonstrates consistent detection performance across all operational categories while maintaining a favorable balance between accuracy and computational efficiency for embedded maritime Search-and-Rescue deployment.
 
 ## Training Strategy and Experimental Controls
 
-Training follows a continuation paradigm from existing checkpoints to preserve maritime feature priors and reduce re-initialization instability in minority-class representations. The dataset remains frozen during this stage, meaning no additional remapping, augmentation, or split modifications are introduced once training begins. This separation is critical: gains observed during training are attributable to optimization behavior and model capacity, not hidden dataset drift.
+Training follows a continuation-learning strategy using pretrained checkpoints to preserve generic visual representations while adapting the models to the maritime SAR domain. Once dataset preparation was finalized, the training pipeline remained completely frozen, ensuring that all subsequent performance improvements originated from model optimization rather than hidden changes to the dataset.
 
-The practical configuration emphasizes convergence stability under constrained cloud hardware (dual-GPU T4 workflow), fixed-resolution training at 640, large-batch gradients for minority-class stability, and strict per-class monitoring. The person class is intentionally retained at high frequency to preserve mission realism and recall robustness.
+The experimental protocol is governed by the following controls:
+
+- **Frozen Dataset:** No additional remapping, augmentation, or sample injection is performed after training begins.
+- **Identical Training Conditions:** All benchmarked architectures are trained using the same dataset splits, preprocessing pipeline, optimizer configuration, and evaluation protocol.
+- **Fixed Input Resolution:** Training is performed at a constant image resolution to ensure fair architectural comparisons.
+- **Continuation Learning:** Models are initialized from pretrained weights to accelerate convergence and retain transferable visual features.
+- **Large-Batch Optimization:** Batch sizes are selected to improve gradient stability, particularly for minority classes.
+- **Per-Class Monitoring:** Precision, Recall, mAP@50, and mAP@50-95 are continuously monitored to identify class-specific learning behavior throughout training.
+- **Mission-Oriented Sampling:** The naturally high frequency of the **person** class is intentionally preserved, reflecting its critical importance in real-world maritime Search-and-Rescue operations.
+
+This controlled training methodology ensures that the reported benchmark results remain directly comparable across architectures while providing a reliable foundation for deployment-oriented evaluation on embedded hardware.
 
 ## Conversion, Quantization, and Deployment Pipeline
 
 ```mermaid
-flowchart TD
-    subgraph Q1[Training and Evaluation Track]
-        direction TB
-        A1[Frozen Dataset Splits] --> A2[YOLO v8 v11 v28 Training]
-        A2 --> A3[Validation Monitoring]
-        A3 --> A4[Six-Model Comparative Selection]
-    end
+flowchart TB
 
-    subgraph Q2[Compilation and Hardware Track]
-        direction TB
-        B1[PyTorch Checkpoint] --> B2[ONNX Static Export 640x640 bs1]
-        B2 --> B3[RKNN Operator Mapping and Graph Optimization]
-        B3 --> B4[INT8 Calibration and Quantization]
-        B4 --> B5[RKNN Runtime Profiling]
-    end
+%% ================= TRAINING TRACK =================
+subgraph T1["Training & Model Selection"]
+direction LR
+A1["Frozen Dataset"]
+--> A2["YOLOv8 / YOLOv11 / YOLO26 Training"]
+--> A3["Validation & Evaluation"]
+--> A4["Deployment Model Selection"]
+end
 
-    A4 --> B1
+%% ================= DEPLOYMENT TRACK =================
+subgraph T2["Conversion & Deployment"]
+direction LR
+B1["PyTorch Checkpoint"]
+--> B2["ONNX Export<br/>(Static 640×640)"]
+--> B3["RKNN Graph Optimization"]
+--> B4["INT8 Quantization"]
+--> B5["RK3588 Runtime Profiling"]
+end
+
+A4 --> B1
 ```
 
-The deployment transformation pathway is compiler-oriented and deterministic: trained checkpoints are exported to static ONNX, compiled through RKNN constraints, and quantized to INT8 using calibration data that reflects maritime visual statistics. Static graph requirements, operator compatibility limits, and quantization range estimation are treated as first-order constraints because these factors directly determine whether research-grade models remain functionally reliable on embedded NPUs.
+SentinelBlue employs a deterministic deployment pipeline designed specifically for RK3588-based embedded NPUs. Once the optimal model has been selected through architecture benchmarking, the corresponding PyTorch checkpoint is exported to a static ONNX graph before undergoing RKNN compilation, graph optimization, and INT8 quantization.
 
-## Project Progress Roadmap (Completed)
+The deployment workflow is governed by several practical constraints:
 
-SentinelBlue has progressed through a tightly staged pipeline: taxonomy consolidation and data curation were completed first, followed by deterministic remapping and class-balancing scripts, then class-specific augmentation for minority categories, then six-model training across YOLO nano and small scales, followed by metric-driven comparison and ONNX export for deployable checkpoints. This sequencing was intentional and prevented premature architecture conclusions before data quality and class distribution were stabilized.
+- **Static ONNX export** ensures compatibility with the RKNN conversion toolchain.
+- **Operator compatibility** is verified during graph compilation to prevent unsupported runtime operations.
+- **INT8 calibration** is performed using representative maritime imagery to minimize post-quantization accuracy degradation.
+- **RKNN profiling** validates inference latency, memory utilization, and runtime stability on the target hardware.
 
-```mermaid
-flowchart TD
-    subgraph R1[Data Foundation]
-        direction TB
-        R1A[Taxonomy Freeze] --> R1B[Imbalance Diagnosis]
-        R1B --> R1C[Remapping and Reintroduction]
-        R1C --> R1D[Class-Conditional Augmentation]
-    end
-
-    subgraph R2[Model and Deployment Preparation]
-        direction TB
-        R2A[Six-Model YOLO Training] --> R2B[Unified Evaluation]
-        R2B --> R2C[ONNX Export]
-        R2C --> R2D[Quantization Track]
-    end
-
-    R1D --> R2A
-```
+By treating compilation, quantization, and runtime validation as integral components of the machine learning pipeline rather than post-processing steps, SentinelBlue ensures that the deployment model preserves the performance characteristics observed during offline evaluation while remaining suitable for real-time embedded maritime SAR inference.
 
 ## Full Documentation Index
 
-The following documentation files provide the complete technical rationale and implementation details.
+The repository is accompanied by a comprehensive set of technical documents that describe the design rationale, engineering methodology, and deployment pipeline in greater detail. Each document focuses on a specific aspect of the project and collectively provides a complete overview of the SentinelBlue development workflow.
 
-- [Documentation/Project Overview.md](Documentation/Project%20Overview.md)
-- [Documentation/Model Selection Strategy.md](Documentation/Model%20Selection%20Strategy.md)
-- [Documentation/Class Taxonomy.md](Documentation/Class%20Taxonomy.md)
-- [Documentation/Data Curation Strategy.md](Documentation/Data%20Curation%20Strategy.md)
-- [Documentation/Class Imbalance Rationale.md](Documentation/Class%20Imbalance%20Rationale.md)
-- [Documentation/Data Augmentation Methodology.md](Documentation/Data%20Augmentation%20Methodology.md)
-- [Documentation/Training Strategy.md](Documentation/Training%20Strategy.md)
-- [Documentation/Quantization Strategy.md](Documentation/Quantization%20Strategy.md)
+| Document | Description |
+| :--- | :--- |
+| **[Project Overview](Documentation/Project%20Overview.md)** | High-level project objectives, system architecture, and overall development workflow. |
+| **[Model Selection Strategy](Documentation/Model%20Selection%20Strategy.md)** | Benchmarking methodology and rationale behind selecting the final deployment model. |
+| **[Class Taxonomy](Documentation/Class%20Taxonomy.md)** | Design philosophy and operational justification for the five-class SAR taxonomy. |
+| **[Data Curation Strategy](Documentation/Data%20Curation%20Strategy.md)** | Dataset construction, class remapping, split policy, and evaluation integrity. |
+| **[Class Imbalance Rationale](Documentation/Class%20Imbalance%20Rationale.md)** | Analysis of dataset imbalance and the techniques adopted to improve minority-class representation. |
+| **[Data Augmentation Methodology](Documentation/Data%20Augmentation%20Methodology.md)** | Class-specific augmentation policies and realism constraints applied during training. |
+| **[Training Strategy](Documentation/Training%20Strategy.md)** | Experimental controls, optimization methodology, and reproducibility considerations. |
+| **[Quantization Strategy](Documentation/Quantization%20Strategy.md)** | ONNX conversion, RKNN compilation, INT8 quantization, and embedded deployment workflow. |
 
 ## Deployment on Radxa ROCK 5C
 
