@@ -1,12 +1,13 @@
 # SentinelBlue
 
-**Real-Time Maritime Search-and-Rescue (SAR) Perception on RK3588 Edge Hardware**
-
-<p align="center">
+<div align="center">
   <a href="Inference%20Videos/Output%20Videos/multi.mp4">
-    <strong>▶️ Watch SentinelBlue Inference Demo</strong>
+    <img src="multi.gif" alt="SentinelBlue Inference Demo" width="100%">
   </a>
-</p>
+  <br>
+  <strong>Real-Time Maritime Search-and-Rescue (SAR) Perception on RK3588 Edge Hardware</strong>
+</div>
+<br>
 
 SentinelBlue is a maritime Search-and-Rescue (SAR) perception system focused on real-time RGB object detection from UAV viewpoints under embedded compute constraints. Rather than acting as an autonomous rescue controller, SentinelBlue functions as a high-reliability perception and reporting module. Onboard inference produces structured detection evidence, contextualizes maritime SAR cues, and transmits them to the ground station, while all rescue decisions remain human-authorized.
 
@@ -66,12 +67,12 @@ The system remains deliberately conservative: no autonomous rescue decisions are
 
 SentinelBlue adopts a **frozen five-class taxonomy** that remains consistent throughout dataset curation, model training, evaluation, and deployment. The taxonomy is intentionally **function-oriented** rather than manufacturer- or appearance-oriented, ensuring that detected objects correspond directly to operationally meaningful SAR entities.
 
-| Class | Operational Role in SAR |
-| :--- | :--- |
-| **person** | Primary distress target; highest-priority class with recall-focused optimization |
-| **boat** | Contextual vessel and potential rescue platform |
-| **jetski** | High-maneuverability watercraft requiring discrimination from conventional boats |
-| **buoy** | Environmental marker providing navigational and situational context |
+| Class                   | Operational Role in SAR                                                            |
+| :---------------------- | :--------------------------------------------------------------------------------- |
+| **person**              | Primary distress target; highest-priority class with recall-focused optimization   |
+| **boat**                | Contextual vessel and potential rescue platform                                    |
+| **jetski**              | High-maneuverability watercraft requiring discrimination from conventional boats   |
+| **buoy**                | Environmental marker providing navigational and situational context                |
 | **emergency_appliance** | Functionally grouped flotation and rescue equipment used during emergency response |
 
 The **emergency_appliance** category deliberately consolidates visually diverse but operationally equivalent rescue equipment into a single semantic class. This reduces dataset sparsity, improves class learnability, and preserves the operational significance of rescue-related objects without unnecessarily fragmenting the taxonomy.
@@ -113,11 +114,11 @@ The augmentation pipeline deliberately avoids unrealistic geometric transformati
 
 To identify the most suitable deployment architecture, all candidate models were trained and evaluated under an identical dataset split, augmentation policy, optimization strategy, and evaluation protocol. This controlled benchmarking framework ensures that observed performance differences arise from architectural characteristics rather than variations in data preparation or training methodology.
 
-| Model | GFLOPs | Precision | Recall | mAP@50 | mAP@50-95 |
-| :--- | ------: | --------: | -----: | -----: | --------: |
-| YOLOv8 | 28.4 | 0.926 | 0.882 | 0.922 | 0.676 |
-| YOLOv11 | 21.3 | 0.912 | 0.862 | 0.907 | 0.667 |
-| YOLO26 | 17.8 | 0.924 | 0.868 | 0.913 | **0.684** |
+| Model   | GFLOPs | Precision | Recall | mAP@50 | mAP@50-95 |
+| :------ | -----: | --------: | -----: | -----: | --------: |
+| YOLOv8  |   28.4 |     0.926 |  0.882 |  0.922 |     0.676 |
+| YOLOv11 |   21.3 |     0.912 |  0.862 |  0.907 |     0.667 |
+| YOLO26  |   17.8 |     0.924 |  0.868 |  0.913 | **0.684** |
 
 Among the evaluated architectures, **YOLO26** achieved the highest **mAP@50-95** while also maintaining the lowest computational complexity (GFLOPs) of the three models. **YOLOv8** delivered the highest precision and recall, whereas **YOLOv11** offered competitive performance with a moderate computational footprint.
 
@@ -140,13 +141,13 @@ This methodology ensures that the selected deployment model represents the best 
 
 The table below presents the class-wise performance of the selected **YOLO26** deployment model. Evaluating performance at the class level provides greater insight into operational behavior than aggregate metrics alone, highlighting how detection quality varies across different maritime objects under real-world SAR conditions.
 
-| Class | Precision | Recall | mAP@50 | mAP@50-95 |
-| :--- | --------: | -----: | -----: | --------: |
-| person | 0.876 | 0.773 | 0.815 | 0.371 |
-| boat | 0.949 | 0.930 | 0.955 | 0.787 |
-| jetski | 0.942 | 0.909 | 0.945 | 0.778 |
-| buoy | 0.879 | 0.866 | 0.836 | 0.567 |
-| emergency_appliance | 0.868 | 0.889 | 0.905 | 0.581 |
+| Class               | Precision | Recall | mAP@50 | mAP@50-95 |
+| :------------------ | --------: | -----: | -----: | --------: |
+| person              |     0.876 |  0.773 |  0.815 |     0.371 |
+| boat                |     0.949 |  0.930 |  0.955 |     0.787 |
+| jetski              |     0.942 |  0.909 |  0.945 |     0.778 |
+| buoy                |     0.879 |  0.866 |  0.836 |     0.567 |
+| emergency_appliance |     0.868 |  0.889 |  0.905 |     0.581 |
 
 The class-level results closely reflect the inherent challenges of maritime object detection. **Boat** and **jetski** achieve the strongest overall performance due to their comparatively distinctive structural features and larger object footprints within UAV imagery. In contrast, **person** remains the most challenging class because of its small apparent size, frequent partial occlusions, and reduced visual contrast against dynamic water backgrounds.
 
@@ -210,16 +211,16 @@ By treating compilation, quantization, and runtime validation as integral compon
 
 The repository is accompanied by a comprehensive set of technical documents that describe the design rationale, engineering methodology, and deployment pipeline in greater detail. Each document focuses on a specific aspect of the project and collectively provides a complete overview of the SentinelBlue development workflow.
 
-| Document | Description |
-| :--- | :--- |
-| **[Project Overview](Documentation/Project%20Overview.md)** | High-level project objectives, system architecture, and overall development workflow. |
-| **[Model Selection Strategy](Documentation/Model%20Selection%20Strategy.md)** | Benchmarking methodology and rationale behind selecting the final deployment model. |
-| **[Class Taxonomy](Documentation/Class%20Taxonomy.md)** | Design philosophy and operational justification for the five-class SAR taxonomy. |
-| **[Data Curation Strategy](Documentation/Data%20Curation%20Strategy.md)** | Dataset construction, class remapping, split policy, and evaluation integrity. |
-| **[Class Imbalance Rationale](Documentation/Class%20Imbalance%20Rationale.md)** | Analysis of dataset imbalance and the techniques adopted to improve minority-class representation. |
-| **[Data Augmentation Methodology](Documentation/Data%20Augmentation%20Methodology.md)** | Class-specific augmentation policies and realism constraints applied during training. |
-| **[Training Strategy](Documentation/Training%20Strategy.md)** | Experimental controls, optimization methodology, and reproducibility considerations. |
-| **[Quantization Strategy](Documentation/Quantization%20Strategy.md)** | ONNX conversion, RKNN compilation, INT8 quantization, and embedded deployment workflow. |
+| Document                                                                                | Description                                                                                        |
+| :-------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------- |
+| **[Project Overview](Documentation/Project%20Overview.md)**                             | High-level project objectives, system architecture, and overall development workflow.              |
+| **[Model Selection Strategy](Documentation/Model%20Selection%20Strategy.md)**           | Benchmarking methodology and rationale behind selecting the final deployment model.                |
+| **[Class Taxonomy](Documentation/Class%20Taxonomy.md)**                                 | Design philosophy and operational justification for the five-class SAR taxonomy.                   |
+| **[Data Curation Strategy](Documentation/Data%20Curation%20Strategy.md)**               | Dataset construction, class remapping, split policy, and evaluation integrity.                     |
+| **[Class Imbalance Rationale](Documentation/Class%20Imbalance%20Rationale.md)**         | Analysis of dataset imbalance and the techniques adopted to improve minority-class representation. |
+| **[Data Augmentation Methodology](Documentation/Data%20Augmentation%20Methodology.md)** | Class-specific augmentation policies and realism constraints applied during training.              |
+| **[Training Strategy](Documentation/Training%20Strategy.md)**                           | Experimental controls, optimization methodology, and reproducibility considerations.               |
+| **[Quantization Strategy](Documentation/Quantization%20Strategy.md)**                   | ONNX conversion, RKNN compilation, INT8 quantization, and embedded deployment workflow.            |
 
 ## Deployment on Radxa ROCK 5C
 
