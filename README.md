@@ -7,6 +7,11 @@
   <p><strong>Real-Time Maritime Search-and-Rescue (SAR) Perception on RK3588 Edge Hardware</strong></p>
 </div>
 
+> [!IMPORTANT]
+> **Legacy RGB Implementation:** This repository has been restructured as SentinelBlue expands beyond the original RGB-only YOLO implementation toward a complete onboard perception, deployment, and ground-station system.
+>
+> If you are using an older fork or want to access the previous RGB-only implementation and repository structure, please refer to the [`legacy-rgb-implementation`](../../tree/legacy-rgb-implementation) branch.
+
 SentinelBlue is a maritime Search-and-Rescue (SAR) perception system focused on real-time RGB object detection from UAV viewpoints under embedded compute constraints. Rather than acting as an autonomous rescue controller, SentinelBlue functions as a high-reliability perception and reporting module. Onboard inference produces structured detection evidence, contextualizes maritime SAR cues, and transmits them to the ground station, while all rescue decisions remain human-authorized.
 
 The project is designed around a reproducible computer vision pipeline that evaluates multiple YOLO architectures under identical training conditions, deterministic dataset engineering practices, and deployment-oriented optimization for RK3588 NPUs. The primary objective is to identify the most practical balance between detection performance and computational efficiency for real-world maritime SAR missions.
