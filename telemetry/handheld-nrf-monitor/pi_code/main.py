@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""
-======================================================================================
-Project: Drone Telemetry Master Companion Server
-File: pi/main.py
-
-Description:
-  Master multi-module supervisor running directly on the Raspberry Pi 4B.
-  Coordinates all 3 core operational modules concurrently over a single MAVLink port:
-  - Module 1: OLED / NRF24L01+ 20-byte compact radio transmitter (for ESP32 Ground Unit)
-  - Module 2: Live Mission Control Web Dashboard & WebSocket server (port 8000)
-  - Module 3: Automated Boustrophedon Grid Search autonomy controller
-======================================================================================
-"""
 
 import os
 import sys
@@ -19,7 +6,6 @@ import time
 import signal
 import argparse
 
-# Add pi directory to module path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 
@@ -48,19 +34,15 @@ def main():
     print(f"[*] Operation Mode:          {'SIMULATION' if args.simulate else 'LIVE PIXHAWK'}")
     print("----------------------------------------------------------------------------")
 
-    # 1. SBC Monitor
     sbc_monitor = SBCMonitor()
     print("[+] Initialized SBC Hardware & Thermal Monitor.")
 
-    # 2. Shared MAVLink Manager
     mav_manager = MAVLinkManager(port=args.port, baud=args.baud, simulate=args.simulate)
     mav_manager.start()
 
-    # 3. Module 3: Grid Search Autonomy Engine
     grid_module = GridSearchModule(mav_manager)
     print("[✓] Module 3 (Grid Search Autonomy): Ready.")
 
-    # 4. Module 2: Mission Control Web Dashboard & WebSocket Server
     dashboard_module = WebDashboardModule(
         mav_manager=mav_manager,
         sbc_monitor=sbc_monitor,
@@ -69,7 +51,6 @@ def main():
     )
     dashboard_module.start()
 
-    # 5. Module 1: NRF24 Radio Transmitter
     radio_module = RadioTXModule(
         mav_manager=mav_manager,
         rate_hz=args.radio_rate,
@@ -78,14 +59,13 @@ def main():
     radio_module.start()
 
     print("\n" + "=" * 76)
-    print(f"  🚀 ALL 3 MODULES RUNNING CONCURRENTLY ON RASPBERRY PI!")
+    print(f"   ALL 3 MODULES RUNNING CONCURRENTLY ON RASPBERRY PI!")
     print(f"  • Module 1 (Radio TX):        NRF24L01+ broadcast -> ESP32 Handheld OLED")
     print(f"  • Module 2 (Web Dashboard):   http://0.0.0.0:{args.web_port}")
     print(f"  • Module 3 (Grid Autonomy):   Boustrophedon generator & MAVLink controller")
     print("=" * 76 + "\n")
     print("[*] Press Ctrl+C to stop all services.\n")
 
-    # Graceful exit handler
     def shutdown(signum, frame):
         print("\n[*] Stopping companion modules...")
         radio_module.stop()
@@ -97,7 +77,6 @@ def main():
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    # Supervisor keep-alive & live console status ticker (every 2s)
     last_print = 0
     while True:
         time.sleep(0.5)

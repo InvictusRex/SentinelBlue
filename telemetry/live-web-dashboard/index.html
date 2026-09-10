@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Drone Mission Control & Telemetry Dashboard</title>
-  <!-- Leaflet Map CSS -->
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="/style.css" />
-  <!-- Google Fonts: Orbitron & Inter -->
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="dashboard-container">
-    <!-- TOP HEADER -->
+
     <header class="top-header">
       <div class="header-left">
         <div class="logo-icon">🛸</div>
@@ -35,9 +35,8 @@
       </div>
     </header>
 
-    <!-- KPI STATS CARDS ROW -->
     <section class="kpi-grid">
-      <!-- 1. BATTERY -->
+
       <div class="card kpi-card">
         <div class="card-header">
           <span class="card-icon">🔋</span>
@@ -56,7 +55,6 @@
         <div class="progress-text"><span id="val-bat-pct">--</span>% Remaining</div>
       </div>
 
-      <!-- 2. ALTITUDE -->
       <div class="card kpi-card">
         <div class="card-header">
           <span class="card-icon">✈️</span>
@@ -72,7 +70,6 @@
         <div class="card-footer-tag" id="tag-alt-status">AGL RELATIVE</div>
       </div>
 
-      <!-- 3. HEADING & ATTITUDE -->
       <div class="card kpi-card">
         <div class="card-header">
           <span class="card-icon">🧭</span>
@@ -89,7 +86,6 @@
         <div class="card-footer-tag" id="tag-compass">COMPASS OK</div>
       </div>
 
-      <!-- 4. SIGNAL & SBC HEALTH -->
       <div class="card kpi-card">
         <div class="card-header">
           <span class="card-icon">📶</span>
@@ -109,9 +105,8 @@
       </div>
     </section>
 
-    <!-- MAIN DASHBOARD CONTENT (MAP & REAL-TIME CHARTS) -->
     <main class="main-grid">
-      <!-- LEFT: GPS MAP & GRID SEARCH CONTROLS -->
+
       <div class="card map-card">
         <div class="card-header flex-between">
           <div class="header-title-group">
@@ -125,11 +120,9 @@
           </div>
         </div>
 
-        <!-- Leaflet Map Container & Floating Mission HUD -->
         <div class="map-view-wrapper">
           <div id="leaflet-map" class="map-view"></div>
 
-          <!-- Floating Live Mission HUD Overlay on Map -->
           <div class="mission-map-hud" id="mission-map-hud">
             <div class="hud-header">
               <span class="hud-dot" id="hud-dot"></span>
@@ -169,7 +162,6 @@
         </div>
       </div>
 
-      <!-- RIGHT: 3-AXIS GYROSCOPE RATES CHART -->
       <div class="card chart-card">
         <div class="card-header flex-between">
           <div class="header-title-group">
@@ -192,7 +184,6 @@
         </div>
       </div>
 
-      <!-- BOTTOM ROW 1: INDIVIDUAL CELL VOLTAGES -->
       <div class="card cell-card">
         <div class="card-header flex-between">
           <div class="header-title-group">
@@ -235,7 +226,6 @@
         </div>
       </div>
 
-      <!-- BOTTOM ROW 2: PID ATTITUDE TRACKING -->
       <div class="card pid-card">
         <div class="card-header flex-between">
           <div class="header-title-group">
@@ -252,7 +242,6 @@
         </div>
       </div>
 
-      <!-- BOTTOM ROW 3: MOTOR POWER EQUALIZER -->
       <div class="card motor-card">
         <div class="card-header">
           <span class="card-icon">⚡</span>
@@ -294,7 +283,6 @@
         </div>
       </div>
 
-      <!-- BOTTOM ROW 4: SBC SYSTEM DIAGNOSTICS -->
       <div class="card sbc-card">
         <div class="card-header">
           <span class="card-icon">💻</span>
@@ -325,7 +313,6 @@
       </div>
     </main>
 
-    <!-- AUTONOMOUS MISSION PLANNER MODAL -->
     <div id="grid-modal" class="modal-overlay hidden">
       <div class="modal-card modal-large">
         <div class="modal-header">
@@ -340,9 +327,9 @@
         </div>
 
         <div class="modal-body modal-grid-layout">
-          <!-- LEFT COLUMN: INPUT CONTROLS -->
+
           <div class="modal-inputs-col">
-            <!-- 1. Search Pattern Selection -->
+
             <div class="section-label">1. SEARCH PATTERN</div>
             <div class="pattern-selector">
               <label class="pattern-option">
@@ -371,7 +358,6 @@
               </label>
             </div>
 
-            <!-- 2. Target Center Location -->
             <div class="section-label">2. TARGET CENTER POINT</div>
             <div class="form-group">
               <div class="radio-pill-group">
@@ -392,7 +378,6 @@
               </div>
             </div>
 
-            <!-- 3. Search Radius Slider -->
             <div class="section-label">3. SEARCH RADIUS & SPACING</div>
             <div class="form-group">
               <div class="slider-header">
@@ -413,7 +398,6 @@
               </div>
             </div>
 
-            <!-- 4. Flight Dynamics & Safety -->
             <div class="section-label">4. FLIGHT DYNAMICS & END ACTION</div>
             <div class="form-row-3">
               <div class="form-group">
@@ -435,7 +419,6 @@
             </div>
           </div>
 
-          <!-- RIGHT COLUMN: PREVIEW STATS & ACTION HUB -->
           <div class="modal-preview-col">
             <div class="section-label">5. ROUTE ANALYTICS & PREVIEW</div>
 
@@ -487,7 +470,6 @@
     </div>
   </div>
 
-  <!-- Leaflet Map JS & Chart.js -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="/app.js"></script>

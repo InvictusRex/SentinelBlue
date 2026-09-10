@@ -1,20 +1,4 @@
 #!/usr/bin/env python3
-"""
-======================================================================================
-Module: MAVLink Telemetry Manager & Shared State Hub
-File: pi/modules/mavlink_manager.py
-
-Description:
-  Singleton MAVLink reader that connects to Pixhawk 2.4.8 on TELEM2 (/dev/serial0)
-  or USB (/dev/ttyACM0 @ 115200 baud).
-
-  Key Features:
-  - Broadcasts 1 Hz Companion Heartbeats to keep ArduPilot active telemetry streaming alive
-  - Requests all sensor & attitude streams at 10 Hz
-  - Decodes ATTITUDE, AHRS, SYS_STATUS, GLOBAL_POSITION_INT, VFR_HUD, RAW_IMU, SERVO_OUTPUT
-  - Thread-safe state store for WebSockets and Radio TX
-======================================================================================
-"""
 
 import time
 import math
@@ -32,45 +16,37 @@ class MAVLinkManager:
         self._lock = threading.Lock()
         self._serial_cmd_lock = threading.Lock()
 
-        # Simulation mission playback storage
         self.sim_mission_items: List[Dict[str, Any]] = []
         self.sim_mission_index: int = 0
         self.sim_current_lat: float = 12.971598
         self.sim_current_lon: float = 77.594562
         self.sim_current_alt: float = 0.0
 
-        # Telemetry State Store (All 11 Categories + Mission Autonomy)
         self.state: Dict[str, Any] = {
-            # 1. Total Battery & Power
+
             "battery_voltage": 0.0,
             "battery_current": 0.0,
             "battery_remaining": 0,
 
-            # 2. Individual Cell Voltages (Cell 1 to 6)
             "cell_voltages": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             "cell_delta_mv": 0,
 
-            # 3. Altitude & Vertical Dynamics
             "altitude_relative": 0.0,
             "altitude_msl": 0.0,
             "climb_rate": 0.0,
 
-            # 4. GPS & Positioning
             "latitude": 0.0,
             "longitude": 0.0,
             "satellites": 0,
             "gps_fix_type": "NO FIX",
             "hdop": 99.9,
 
-            # 5. Signal Strength & Telemetry Link
             "rc_rssi": 0,
             "radio_link_quality": 0,
 
-            # 6. Heading & Compass
             "heading": 0.0,
             "compass_status": "CALIBRATED",
 
-            # 7. Flight Status & Mission Autonomy State
             "armed": False,
             "flight_mode": "DISCONNECTED",
             "system_status": "STANDBY",
@@ -82,7 +58,6 @@ class MAVLinkManager:
             "target_wp_lat": 0.0,
             "target_wp_lon": 0.0,
 
-            # 8. 3-Axis Gyroscope & Accelerometer Rates
             "gyro_x": 0.0,
             "gyro_y": 0.0,
             "gyro_z": 0.0,
@@ -90,7 +65,6 @@ class MAVLinkManager:
             "accel_y": 0.0,
             "accel_z": 9.81,
 
-            # 9. PID Attitude Tracking & Errors
             "attitude_roll": 0.0,
             "attitude_pitch": 0.0,
             "attitude_yaw": 0.0,
@@ -100,17 +74,15 @@ class MAVLinkManager:
             "error_roll": 0.0,
             "error_pitch": 0.0,
 
-            # 10. Motor Power Outputs (Motors 1 to 4)
             "motor_pwm": [1000, 1000, 1000, 1000],
             "motor_percent": [0, 0, 0, 0],
 
-            # Timing & Status
             "last_packet_timestamp": 0.0,
             "connected": False
         }
 
     def start(self):
-        """Starts the MAVLink ingestion thread."""
+
         if self.running:
             return
         self.running = True
@@ -118,7 +90,7 @@ class MAVLinkManager:
         self.thread.start()
 
     def stop(self):
-        """Stops the ingestion loop."""
+
         self.running = False
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=1.0)
@@ -129,16 +101,12 @@ class MAVLinkManager:
                 pass
 
     def get_telemetry_snapshot(self) -> Dict[str, Any]:
-        """Thread-safe copy of latest telemetry."""
+
         with self._lock:
             return dict(self.state)
 
-    # ----------------------------------------------------------------------------------
-    # MAVLINK COMMAND & MISSION METHODS
-    # ----------------------------------------------------------------------------------
-
     def set_flight_mode(self, mode: str) -> bool:
-        """Commands Pixhawk into requested flight mode (e.g. AUTO, LOITER, RTL, GUIDED)."""
+
         mode_upper = mode.upper()
         if self.simulate or not self.mav:
             print(f"[✓] Simulation: Flight mode switched to '{mode_upper}'")
@@ -187,7 +155,7 @@ class MAVLinkManager:
                 return False
 
     def set_arm(self, arm: bool = True, force: bool = False) -> bool:
-        """Arms or disarms the motors."""
+
         if self.simulate or not self.mav:
             print(f"[✓] Simulation: Motors {'ARMED' if arm else 'DISARMED'}")
             with self._lock:
@@ -214,7 +182,7 @@ class MAVLinkManager:
                 return False
 
     def clear_all_missions(self) -> bool:
-        """Clears all mission waypoints from flight controller."""
+
         if self.simulate or not self.mav:
             with self._lock:
                 self.sim_mission_items = []
@@ -241,7 +209,7 @@ class MAVLinkManager:
                 return False
 
     def upload_mission_items(self, items: List[Dict[str, Any]]) -> bool:
-        """Thread-safe mission upload to Pixhawk using MAVLink Mission Protocol."""
+
         if self.simulate or not self.mav:
             print(f"[✓] Simulation: Loaded {len(items)} mission items into simulator memory.")
             with self._lock:
@@ -259,15 +227,12 @@ class MAVLinkManager:
                 target_sys = getattr(self.mav, "target_system", 1) or 1
                 target_comp = getattr(self.mav, "target_component", 1) or 1
 
-                # 1. Clear existing mission
                 self.mav.mav.mission_clear_all_send(target_sys, target_comp)
                 time.sleep(0.1)
 
-                # 2. Announce mission count
                 total_count = len(items)
                 self.mav.mav.mission_count_send(target_sys, target_comp, total_count)
 
-                # 3. Transmit mission items upon request
                 start_time = time.time()
                 seq = 0
                 while seq < total_count and (time.time() - start_time < 15.0):
@@ -323,7 +288,7 @@ class MAVLinkManager:
             self._run_live_mavlink()
 
     def _send_companion_heartbeat(self, mavutil):
-        """Sends periodic 1 Hz GCS heartbeat from Pi to Pixhawk to keep streams active."""
+
         if not self.mav:
             return
         try:
@@ -337,23 +302,23 @@ class MAVLinkManager:
             pass
 
     def _request_all_streams(self, mavutil):
-        """Requests individual telemetry streams, sets stream params, and modern message intervals."""
+
         if not self.mav:
             return
 
         target_sys = getattr(self.mav, "target_system", 1) or 1
-        target_comp = 1  # ArduPilot Autopilot primary component is always 1
+        target_comp = 1
 
         try:
-            # 1. Set ArduPilot Stream Parameters (SR0=USB, SR1=TELEM1, SR2=TELEM2)
+
             stream_params = {
-                "SR0_EXTRA1": 10.0,   # ATTITUDE @ 10 Hz
-                "SR0_EXTRA2": 10.0,   # VFR_HUD @ 10 Hz
-                "SR0_EXTRA3": 10.0,   # AHRS / system status @ 10 Hz
-                "SR0_RAW_SENS": 10.0, # RAW_IMU / SCALED_IMU @ 10 Hz
-                "SR0_POSITION": 5.0,  # GPS & position @ 5 Hz
-                "SR0_EXT_STAT": 2.0,  # SYS_STATUS & battery @ 2 Hz
-                "SR0_RC_CHAN": 5.0,   # RC_CHANNELS & servos @ 5 Hz
+                "SR0_EXTRA1": 10.0,
+                "SR0_EXTRA2": 10.0,
+                "SR0_EXTRA3": 10.0,
+                "SR0_RAW_SENS": 10.0,
+                "SR0_POSITION": 5.0,
+                "SR0_EXT_STAT": 2.0,
+                "SR0_RC_CHAN": 5.0,
 
                 "SR1_EXTRA1": 10.0,
                 "SR1_EXTRA2": 10.0,
@@ -382,7 +347,6 @@ class MAVLinkManager:
                 except Exception:
                     pass
 
-            # 2. Legacy MAV_DATA_STREAM requests (targeting both Component 1 and Component 0)
             target_comps = [1, 0]
             if getattr(self.mav, "target_component", 0) not in target_comps:
                 target_comps.append(self.mav.target_component)
@@ -402,18 +366,17 @@ class MAVLinkManager:
                         target_sys, comp_id, s, 10, 1
                     )
 
-            # 3. Modern message intervals (in microseconds)
             intervals = {
-                mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE: 100000,            # 10 Hz
-                mavutil.mavlink.MAVLINK_MSG_ID_RAW_IMU: 100000,             # 10 Hz
-                mavutil.mavlink.MAVLINK_MSG_ID_SCALED_IMU: 100000,          # 10 Hz
-                mavutil.mavlink.MAVLINK_MSG_ID_GLOBAL_POSITION_INT: 200000, # 5 Hz
-                mavutil.mavlink.MAVLINK_MSG_ID_GPS_RAW_INT: 200000,         # 5 Hz
-                mavutil.mavlink.MAVLINK_MSG_ID_VFR_HUD: 200000,             # 5 Hz
-                mavutil.mavlink.MAVLINK_MSG_ID_SYS_STATUS: 500000,          # 2 Hz
-                mavutil.mavlink.MAVLINK_MSG_ID_BATTERY_STATUS: 500000,      # 2 Hz
-                mavutil.mavlink.MAVLINK_MSG_ID_SERVO_OUTPUT_RAW: 200000,    # 5 Hz
-                mavutil.mavlink.MAVLINK_MSG_ID_NAV_CONTROLLER_OUTPUT: 200000# 5 Hz
+                mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE: 100000,
+                mavutil.mavlink.MAVLINK_MSG_ID_RAW_IMU: 100000,
+                mavutil.mavlink.MAVLINK_MSG_ID_SCALED_IMU: 100000,
+                mavutil.mavlink.MAVLINK_MSG_ID_GLOBAL_POSITION_INT: 200000,
+                mavutil.mavlink.MAVLINK_MSG_ID_GPS_RAW_INT: 200000,
+                mavutil.mavlink.MAVLINK_MSG_ID_VFR_HUD: 200000,
+                mavutil.mavlink.MAVLINK_MSG_ID_SYS_STATUS: 500000,
+                mavutil.mavlink.MAVLINK_MSG_ID_BATTERY_STATUS: 500000,
+                mavutil.mavlink.MAVLINK_MSG_ID_SERVO_OUTPUT_RAW: 200000,
+                mavutil.mavlink.MAVLINK_MSG_ID_NAV_CONTROLLER_OUTPUT: 200000
             }
             for msg_id, interval_us in intervals.items():
                 self.mav.mav.command_long_send(
@@ -463,36 +426,30 @@ class MAVLinkManager:
             except Exception:
                 pass
 
-            # Activate streams and send companion heartbeat
             self._send_companion_heartbeat(mavutil)
             self._request_all_streams(mavutil)
 
             last_heartbeat_time = time.time()
             last_stream_request_time = time.time()
 
-            # Live Ingestion Loop
             while self.running:
                 try:
                     now = time.time()
 
-                    # 1. Send Companion Heartbeat at 1 Hz (CRITICAL for ArduPilot to stream data!)
                     if now - last_heartbeat_time >= 1.0:
                         last_heartbeat_time = now
                         self._send_companion_heartbeat(mavutil)
 
-                    # 2. Re-request stream keep-alive every 3s
                     if now - last_stream_request_time >= 3.0:
                         last_stream_request_time = now
                         self._request_all_streams(mavutil)
 
-                    # 3. Check for 10-second Heartbeat Loss Timeout
                     last_pkt = self.state.get("last_packet_timestamp", 0.0)
                     if self.state.get("connected", False) and last_pkt > 0 and (now - last_pkt > 10.0):
                         with self._lock:
                             self.state["connected"] = False
                             self.state["flight_mode"] = "NO HEARTBEAT"
 
-                    # 3. Read incoming packets (drain all pending in buffer)
                     packets_read = 0
                     while packets_read < 50:
                         msg = self.mav.recv_match(blocking=False)
@@ -507,7 +464,6 @@ class MAVLinkManager:
                                 self.state["last_packet_timestamp"] = now
                                 self.state["connected"] = True
 
-                                # 1. HEARTBEAT
                                 if msg_type == 'HEARTBEAT':
                                     self.state["armed"] = (msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) != 0
                                     try:
@@ -523,7 +479,6 @@ class MAVLinkManager:
                                     }
                                     self.state["system_status"] = sys_status_map.get(msg.system_status, "ACTIVE")
 
-                                # 2. SYS_STATUS
                                 elif msg_type == 'SYS_STATUS':
                                     if msg.voltage_battery > 0:
                                         self.state["battery_voltage"] = round(msg.voltage_battery / 1000.0, 2)
@@ -532,7 +487,6 @@ class MAVLinkManager:
                                     if 0 <= msg.battery_remaining <= 100:
                                         self.state["battery_remaining"] = msg.battery_remaining
 
-                                # 3. BATTERY_STATUS
                                 elif msg_type == 'BATTERY_STATUS':
                                     if len(msg.voltages) > 0:
                                         valid_cells = []
@@ -552,7 +506,6 @@ class MAVLinkManager:
                                     if 0 <= msg.battery_remaining <= 100:
                                         self.state["battery_remaining"] = msg.battery_remaining
 
-                                # 4. GLOBAL_POSITION_INT
                                 elif msg_type == 'GLOBAL_POSITION_INT':
                                     self.state["latitude"] = round(msg.lat / 1e7, 7)
                                     self.state["longitude"] = round(msg.lon / 1e7, 7)
@@ -561,14 +514,12 @@ class MAVLinkManager:
                                     if msg.hdg != 65535 and msg.hdg != 0:
                                         self.state["heading"] = round(msg.hdg / 100.0, 1)
 
-                                # 5. GPS_RAW_INT
                                 elif msg_type == 'GPS_RAW_INT':
                                     self.state["satellites"] = msg.satellites_visible
                                     fix_map = {0: "NO FIX", 1: "NO FIX", 2: "2D FIX", 3: "3D FIX", 4: "DGPS", 5: "RTK FLT", 6: "RTK FIX"}
                                     self.state["gps_fix_type"] = fix_map.get(msg.fix_type, "NO FIX" if msg.fix_type == 0 else "3D FIX")
                                     self.state["hdop"] = round(msg.eph / 100.0, 2)
 
-                                # 6. VFR_HUD
                                 elif msg_type == 'VFR_HUD':
                                     self.state["climb_rate"] = round(msg.climb, 2)
                                     if msg.heading != 0:
@@ -578,7 +529,6 @@ class MAVLinkManager:
                                         if self.state["altitude_relative"] == 0.0:
                                             self.state["altitude_relative"] = round(msg.alt, 1)
 
-                                # 7. ATTITUDE & AHRS (Euler Angles & Angular Rates)
                                 elif msg_type in ('ATTITUDE', 'AHRS2', 'AHRS3'):
                                     if hasattr(msg, 'roll'):
                                         self.state["attitude_roll"] = round(math.degrees(msg.roll), 2)
@@ -593,7 +543,6 @@ class MAVLinkManager:
                                     self.state["error_roll"] = round(self.state["target_roll"] - self.state["attitude_roll"], 2)
                                     self.state["error_pitch"] = round(self.state["target_pitch"] - self.state["attitude_pitch"], 2)
 
-                                # 8. ATTITUDE_TARGET & NAV_CONTROLLER_OUTPUT
                                 elif msg_type == 'ATTITUDE_TARGET':
                                     try:
                                         q = msg.q
@@ -614,7 +563,6 @@ class MAVLinkManager:
                                     self.state["error_roll"] = round(msg.nav_roll - self.state["attitude_roll"], 2)
                                     self.state["error_pitch"] = round(msg.nav_pitch - self.state["attitude_pitch"], 2)
 
-                                # 9. HIGHRES_IMU / RAW_IMU / SCALED_IMU
                                 elif msg_type == 'HIGHRES_IMU':
                                     self.state["accel_x"] = round(msg.xacc, 2)
                                     self.state["accel_y"] = round(msg.yacc, 2)
@@ -631,7 +579,6 @@ class MAVLinkManager:
                                         self.state["gyro_y"] = round(math.degrees(msg.ygyro / 1000.0), 2)
                                         self.state["gyro_z"] = round(math.degrees(msg.zgyro / 1000.0), 2)
 
-                                # 10. SERVO_OUTPUT_RAW (Motor PWMs 1-4)
                                 elif msg_type == 'SERVO_OUTPUT_RAW':
                                     pwms = [msg.servo1_raw, msg.servo2_raw, msg.servo3_raw, msg.servo4_raw]
                                     self.state["motor_pwm"] = pwms
@@ -639,14 +586,12 @@ class MAVLinkManager:
                                         max(0, min(100, int((p - 1000) / 10.0))) for p in pwms
                                     ]
 
-                                # 11. RC_CHANNELS
                                 elif msg_type == 'RC_CHANNELS':
                                     if msg.rssi > 0:
                                         self.state["rc_rssi"] = int((msg.rssi / 255.0) * 100)
                                     else:
                                         self.state["rc_rssi"] = 90
 
-                                # 12. MISSION_CURRENT & MISSION_ITEM_REACHED
                                 elif msg_type == 'MISSION_CURRENT':
                                     self.state["mission_current_seq"] = msg.seq
                                     tot = self.state.get("mission_total_items", 0)
@@ -661,7 +606,7 @@ class MAVLinkManager:
                         except Exception:
                             pass
 
-                    time.sleep(0.005) # Yield CPU
+                    time.sleep(0.005)
 
                 except Exception as e:
                     print(f"[!] MAVLink read error: {e}")
@@ -669,7 +614,7 @@ class MAVLinkManager:
                     break
 
     def _run_simulation(self):
-        """Dynamic simulation loop supporting both manual flight and autonomous mission execution."""
+
         print("[+] Starting high-fidelity telemetry & mission autonomy simulator (10 Hz)...")
         t = 0.0
         base_lat = 12.971598
@@ -690,7 +635,6 @@ class MAVLinkManager:
             is_auto = (self.state.get("flight_mode") == "AUTO")
             has_mission = len(self.sim_mission_items) > 0
 
-            # Default parameters
             sim_lat = self.sim_current_lat
             sim_lon = self.sim_current_lon
             sim_alt = self.sim_current_alt
@@ -701,18 +645,16 @@ class MAVLinkManager:
             mission_state = self.state.get("mission_state", "STANDBY")
             progress_pct = self.state.get("mission_progress_percent", 0)
 
-            # --- AUTONOMOUS MISSION FLIGHT SIMULATOR ---
             if is_auto and has_mission and self.sim_mission_index < len(self.sim_mission_items):
                 item = self.sim_mission_items[self.sim_mission_index]
                 cmd = item.get("command", 16)
                 total_wps = len(self.sim_mission_items)
                 progress_pct = min(100, int((self.sim_mission_index / float(total_wps)) * 100))
 
-                # 1. Takeoff Command (MAV_CMD_NAV_TAKEOFF = 22)
                 if cmd == 22:
                     target_alt = item.get("z", 15.0)
                     if sim_alt < target_alt - 0.2:
-                        sim_alt += 0.4 # Climb at 4 m/s
+                        sim_alt += 0.4
                         climb_rate = 4.0
                         pitch_actual = 1.5
                         mission_state = f"TAKEOFF ({sim_alt:.1f}m / {target_alt:.0f}m)"
@@ -722,17 +664,14 @@ class MAVLinkManager:
                         self.sim_mission_index += 1
                         mission_state = f"CRUISE -> WP 1"
 
-                # 2. Speed Command (MAV_CMD_DO_CHANGE_SPEED = 178)
                 elif cmd == 178:
                     self.sim_mission_index += 1
 
-                # 3. Waypoint Command (MAV_CMD_NAV_WAYPOINT = 16)
                 elif cmd == 16:
                     target_lat = item.get("x", 0) / 1e7
                     target_lon = item.get("y", 0) / 1e7
                     target_alt = item.get("z", 15.0)
 
-                    # Calculate distance and bearing to waypoint
                     dlat = (target_lat - sim_lat) * (math.pi / 180.0) * EARTH_R
                     dlon = (target_lon - sim_lon) * (math.pi / 180.0) * EARTH_R * math.cos(math.radians(sim_lat))
                     dist = math.sqrt(dlat**2 + dlon**2)
@@ -742,9 +681,8 @@ class MAVLinkManager:
                     sim_heading = (sim_heading + min(max(heading_err * 0.3, -12.0), 12.0)) % 360.0
 
                     roll_actual = round(min(max(heading_err * 0.5, -20.0), 20.0), 2)
-                    pitch_actual = -3.5 # Forward acceleration pitch
+                    pitch_actual = -3.5
 
-                    # Step towards target at 5.0 m/s (0.5m per 0.1s tick)
                     step_m = min(0.5, dist)
                     if dist > 0.01:
                         sim_lat += (dlat / dist) * (step_m / EARTH_R) * (180.0 / math.pi)
@@ -752,11 +690,9 @@ class MAVLinkManager:
 
                     mission_state = f"NAV WP {self.sim_mission_index}/{total_wps - 1} ({dist:.1f}m)"
 
-                    # Reached Waypoint Acceptance Radius (2.0m)
                     if dist <= 2.0:
                         self.sim_mission_index += 1
 
-                # 4. Return to Launch / Land (MAV_CMD_NAV_RETURN_TO_LAUNCH = 20, MAV_CMD_NAV_LAND = 21)
                 elif cmd in (20, 21):
                     dlat = (base_lat - sim_lat) * (math.pi / 180.0) * EARTH_R
                     dlon = (base_lon - sim_lon) * (math.pi / 180.0) * EARTH_R * math.cos(math.radians(sim_lat))
@@ -771,7 +707,7 @@ class MAVLinkManager:
                         mission_state = f"RTL RETURN ({dist:.1f}m)"
                     else:
                         if sim_alt > 0.3:
-                            sim_alt -= 0.3 # Descend at 3 m/s
+                            sim_alt -= 0.3
                             climb_rate = -3.0
                             mission_state = f"RTL LANDING ({sim_alt:.1f}m)"
                         else:
@@ -791,7 +727,7 @@ class MAVLinkManager:
                 progress_pct = 100
 
             else:
-                # Normal Loiter / Telemetry Simulation Mode
+
                 sim_alt = round(max(0.0, 15.0 + 3.0 * math.sin(t * 0.2)), 1)
                 sim_lat = round(base_lat + 0.0004 * math.sin(t * 0.1), 7)
                 sim_lon = round(base_lon + 0.0004 * math.cos(t * 0.1), 7)

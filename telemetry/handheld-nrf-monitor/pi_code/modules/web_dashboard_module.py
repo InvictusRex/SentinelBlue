@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""
-======================================================================================
-Module 2: Real-Time Mission Control Web Dashboard & Telemetry Hub
-File: pi/modules/web_dashboard_module.py
-
-Description:
-  Serves the aerospace Mission Control Web UI directly from the Raspberry Pi:
-  - Serves static assets (HTML/CSS/JS) on port 8000
-  - Streams 10 Hz live JSON telemetry frames over WebSocket (/ws/telemetry)
-  - Provides REST API (/api/telemetry)
-  - Provides Grid Search mission trigger API (/api/mission/grid_search)
-======================================================================================
-"""
 
 import os
 import time
@@ -24,13 +11,13 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-WEB_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "web"))
+WEB_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "..", "live-web-dashboard"))
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
 def encode_ws_frame(message: str) -> bytes:
-    """Encodes a text string into an unmasked RFC 6455 WebSocket frame."""
+
     data = message.encode('utf-8')
     length = len(data)
     frame = bytearray([0x81])
@@ -88,7 +75,7 @@ class WebDashboardModule:
 
     def _ws_broadcaster(self):
         while self.running:
-            time.sleep(0.1) # 10 Hz
+            time.sleep(0.1)
             with self.ws_lock:
                 if not self.connected_websockets:
                     continue
@@ -112,14 +99,13 @@ class WebDashboardModule:
                 pass
 
             def do_GET(self):
-                # WebSocket upgrade
+
                 if self.headers.get("Upgrade", "").lower() == "websocket":
                     self.handle_websocket()
                     return
 
                 clean_path = self.path.split("?")[0]
 
-                # REST API /api/telemetry
                 if clean_path == "/api/telemetry":
                     payload = json.dumps(parent.get_full_telemetry())
                     self.send_response(200)
@@ -129,7 +115,6 @@ class WebDashboardModule:
                     self.wfile.write(payload.encode("utf-8"))
                     return
 
-                # Mission Status
                 if clean_path in ("/api/mission/status", "/api/mission/grid_search") and parent.grid_module:
                     payload = json.dumps(parent.grid_module.get_status())
                     self.send_response(200)
@@ -139,7 +124,6 @@ class WebDashboardModule:
                     self.wfile.write(payload.encode("utf-8"))
                     return
 
-                # Static files
                 if clean_path in ("/", "/index.html"):
                     target_file = os.path.join(WEB_DIR, "index.html")
                     content_type = "text/html; charset=utf-8"
@@ -170,7 +154,6 @@ class WebDashboardModule:
                 body = self.rfile.read(content_len).decode("utf-8") if content_len > 0 else "{}"
                 params = json.loads(body) if body else {}
 
-                # 1. Mission Preview
                 if clean_path == "/api/mission/preview" and parent.grid_module:
                     snap = parent.mav_manager.get_telemetry_snapshot() if parent.mav_manager else {}
                     lat = params.get("lat") if (params.get("lat") is not None and params.get("lat") != 0) else snap.get("latitude", 12.971598)
@@ -190,7 +173,6 @@ class WebDashboardModule:
                     self._send_json(200, plan)
                     return
 
-                # 2. Mission Upload
                 elif clean_path in ("/api/mission/upload", "/api/mission/grid_search") and parent.grid_module:
                     res = parent.grid_module.trigger_mission_upload(
                         lat=params.get("lat"),
@@ -206,44 +188,37 @@ class WebDashboardModule:
                     self._send_json(200, res)
                     return
 
-                # 3. Mission Start (AUTO)
                 elif clean_path == "/api/mission/start" and parent.grid_module:
                     res = parent.grid_module.start_mission(auto_arm=params.get("auto_arm", True))
                     self._send_json(200, res)
                     return
 
-                # 4. Mission Pause (LOITER)
                 elif clean_path == "/api/mission/pause" and parent.grid_module:
                     res = parent.grid_module.pause_mission()
                     self._send_json(200, res)
                     return
 
-                # 5. Mission Resume (AUTO)
                 elif clean_path == "/api/mission/resume" and parent.grid_module:
                     res = parent.grid_module.resume_mission()
                     self._send_json(200, res)
                     return
 
-                # 6. Mission Abort (RTL)
                 elif clean_path == "/api/mission/abort" and parent.grid_module:
                     res = parent.grid_module.abort_mission()
                     self._send_json(200, res)
                     return
 
-                # 7. Mission Clear
                 elif clean_path == "/api/mission/clear" and parent.grid_module:
                     res = parent.grid_module.clear_mission()
                     self._send_json(200, res)
                     return
 
-                # 8. Flight Mode Change
                 elif clean_path == "/api/mode" and parent.mav_manager:
                     mode = params.get("mode", "STABILIZE")
                     success = parent.mav_manager.set_flight_mode(mode)
                     self._send_json(200, {"status": "success" if success else "error", "mode": mode})
                     return
 
-                # 9. Arm/Disarm
                 elif clean_path == "/api/arm" and parent.mav_manager:
                     arm = params.get("arm", True)
                     success = parent.mav_manager.set_arm(arm)

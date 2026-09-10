@@ -1,9 +1,5 @@
-/* ======================================================================================
-   Drone Mission Control & Autonomous Mission Planner App (app.js)
-   ====================================================================================== */
-
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. DOM ELEMENTS & STATE
+
   const el = {
     batV: document.getElementById('val-bat-v'),
     batA: document.getElementById('val-bat-a'),
@@ -43,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
     sbcDiskTxt: document.getElementById('sbc-disk-txt'),
     sbcUptimeTxt: document.getElementById('sbc-uptime-txt'),
 
-    // Map HUD elements
     hudDot: document.getElementById('hud-dot'),
     hudMissionState: document.getElementById('hud-mission-state'),
     hudWpTracker: document.getElementById('hud-wp-tracker'),
@@ -53,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
     btnHudPause: document.getElementById('btn-hud-pause'),
     btnHudRtl: document.getElementById('btn-hud-rtl'),
 
-    // Modal & Planner elements
     gridModal: document.getElementById('grid-modal'),
     btnOpenModal: document.getElementById('btn-open-grid-modal'),
     btnCloseModal: document.getElementById('btn-close-modal'),
@@ -96,7 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedCenter = [12.971598, 77.594562];
   let activeWpMarkers = [];
 
-  // 2. LEAFLET MAP & MISSION LAYERS
   let map, droneMarker, flightPathPolyline;
   let searchCenterMarker, searchRadiusCircle, missionRoutePolyline, missionLayerGroup;
   const flightHistory = [];
@@ -110,7 +103,6 @@ document.addEventListener('DOMContentLoaded', () => {
       attributionControl: false
     });
 
-    // Google Maps Tile Layers (Hybrid, Terrain, Roadmap, Satellite)
     const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
       maxZoom: 21,
       subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
@@ -135,10 +127,8 @@ document.addEventListener('DOMContentLoaded', () => {
       maxZoom: 19
     });
 
-    // Default layer: Google Hybrid (Satellite + Buildings + Streets)
     googleHybrid.addTo(map);
 
-    // Layer Switcher Control
     const baseMaps = {
       "🛰️ Google Hybrid (Satellite + Buildings & Roads)": googleHybrid,
       "⛰️ Google Terrain (Elevation & Relief)": googleTerrain,
@@ -169,7 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
       dashArray: '4, 6'
     }).addTo(map);
 
-    // Mission Preview & Autonomy Layers
     missionLayerGroup = L.layerGroup().addTo(map);
 
     searchRadiusCircle = L.circle(initialCoords, {
@@ -181,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
       fillOpacity: 0.08
     }).addTo(map);
 
-    // Map Click Listener for Target Point Picking
     map.on('click', (e) => {
       if (isPickingPointOnMap) {
         setSearchCenter(e.latlng.lat, e.latlng.lng);
@@ -241,7 +229,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   el.btnPickCenter.addEventListener('click', () => togglePickMode());
 
-  // 3. CHART.JS REAL-TIME CHARTS
   const maxDataPoints = 40;
   const timeLabels = Array(maxDataPoints).fill('');
 
@@ -292,7 +279,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 4. TELEMETRY DISPATCHER & LIVE MISSION TRACKING
   function updateTelemetry(data) {
     currentTelemetry = data;
 
@@ -351,7 +337,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     el.badgeMission.textContent = isHeartbeatLost ? 'LINK LOST' : (data.mission_state || 'STANDBY');
 
-    // Live Map HUD Update
     if (el.hudMissionState) {
       el.hudMissionState.textContent = `MISSION: ${data.mission_state || 'STANDBY'}`;
       const isAuto = (data.flight_mode === 'AUTO');
@@ -362,7 +347,6 @@ document.addEventListener('DOMContentLoaded', () => {
       el.hudWpTracker.textContent = totItems > 0 ? `WP ${currSeq} / ${totItems}` : '-- / --';
       el.hudProgressFill.style.width = `${data.mission_progress_percent || 0}%`;
 
-      // Update Waypoint Marker active/completed classes
       activeWpMarkers.forEach((m, idx) => {
         const markerDom = m.getElement();
         if (markerDom) {
@@ -465,7 +449,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return directions[Math.round(deg / 45) % 8];
   }
 
-  // 5. AUTONOMOUS MISSION PLANNER & MODAL LOGIC
   el.btnOpenModal.addEventListener('click', () => {
     el.gridModal.classList.remove('hidden');
     el.alertBox.classList.add('hidden');
@@ -479,7 +462,6 @@ document.addEventListener('DOMContentLoaded', () => {
   el.btnCloseModal.addEventListener('click', closeModal);
   el.btnCancelModal.addEventListener('click', closeModal);
 
-  // Radius slider live update
   el.radiusSlider.addEventListener('input', () => {
     const r = parseFloat(el.radiusSlider.value) || 50;
     el.radiusLabel.textContent = r;
@@ -487,17 +469,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   el.radiusSlider.addEventListener('change', () => previewMissionRoute());
 
-  // Input changes trigger route preview
   [el.inputSpacing, el.inputAngle, el.inputAltitude, el.inputSpeed, el.inputEndAction].forEach(elem => {
     elem.addEventListener('change', () => previewMissionRoute());
   });
 
-  // Pattern radio selection
   document.querySelectorAll('input[name="mission-pattern"]').forEach(radio => {
     radio.addEventListener('change', () => previewMissionRoute());
   });
 
-  // Center mode radio selection
   document.querySelectorAll('input[name="center-mode"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
       const mode = e.target.value;
@@ -533,7 +512,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return { lat, lon, radius, spacing, angle, altitude, speed, pattern, end_action };
   }
 
-  // 6. ROUTE PREVIEW ON MAP
   async function previewMissionRoute() {
     const params = getSelectedMissionParams();
     try {
@@ -563,10 +541,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const waypoints = plan.waypoints || [];
     if (waypoints.length === 0) return;
 
-    // Draw waypoints & markers
     const latLngs = waypoints.map(wp => [wp[0], wp[1]]);
 
-    // Path Polyline
     missionRoutePolyline = L.polyline(latLngs, {
       color: '#ffd000',
       weight: 2.5,
@@ -587,7 +563,6 @@ document.addEventListener('DOMContentLoaded', () => {
       activeWpMarkers.push(marker);
     });
 
-    // Takeoff Dynamic Point Marker
     const takeoffIcon = L.divIcon({
       className: 'takeoff-marker-icon',
       html: '<span>🛫</span>',
@@ -601,7 +576,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   el.btnPreviewMission.addEventListener('click', previewMissionRoute);
 
-  // 7. UPLOAD & MISSION CONTROL ACTIONS
   el.btnSubmitGrid.addEventListener('click', async () => {
     const params = getSelectedMissionParams();
     el.alertBox.className = 'alert-box';
@@ -667,7 +641,6 @@ document.addEventListener('DOMContentLoaded', () => {
     el.alertBox.textContent = 'Mission cleared from Pixhawk memory.';
   });
 
-  // 8. WEBSOCKET & SSE CONNECTION
   let lastRxTimestamp = Date.now();
 
   function connectWebSocket() {
@@ -711,7 +684,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {}
   }, 500);
 
-  // 10-Second Heartbeat Watchdog
   setInterval(() => {
     if (Date.now() - lastRxTimestamp > 10000) {
       el.badgeMode.textContent = 'NO HEARTBEAT';

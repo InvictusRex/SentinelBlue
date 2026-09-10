@@ -1,7 +1,3 @@
-/* ======================================================================================
-   Aerospace Mission Control Dark Theme (style.css)
-   ====================================================================================== */
-
 :root {
   --bg-primary: #0a0d14;
   --bg-secondary: #121824;
@@ -48,7 +44,6 @@ body {
   gap: 16px;
 }
 
-/* TOP HEADER */
 .top-header {
   display: flex;
   justify-content: space-between;
@@ -182,7 +177,6 @@ body {
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* CARDS COMMON */
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
@@ -234,7 +228,6 @@ body {
   text-transform: uppercase;
 }
 
-/* KPI GRID */
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -316,7 +309,6 @@ body {
   margin-top: auto;
 }
 
-/* MAIN GRID LAYOUT */
 .main-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -329,7 +321,6 @@ body {
   }
 }
 
-/* MAP CARD */
 .map-card {
   display: flex;
   flex-direction: column;
@@ -414,7 +405,6 @@ body {
   background: rgba(0, 240, 255, 0.4);
 }
 
-/* CHART CARDS */
 .chart-card {
   display: flex;
   flex-direction: column;
@@ -468,7 +458,6 @@ body {
   font-family: var(--font-display);
 }
 
-/* CELL VOLTAGES CARD */
 .cell-delta-tag {
   font-size: 11px;
   font-weight: 700;
@@ -526,7 +515,6 @@ body {
   background: var(--accent-green);
 }
 
-/* PID CARD */
 .pid-errors {
   display: flex;
   gap: 12px;
@@ -538,7 +526,6 @@ body {
   font-family: var(--font-display);
 }
 
-/* MOTOR POWER EQUALIZER */
 .motors-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -592,7 +579,6 @@ body {
   margin-top: 2px;
 }
 
-/* SBC STATS LIST */
 .sbc-stats-list {
   display: flex;
   flex-direction: column;
@@ -628,7 +614,6 @@ body {
   margin-left: 6px;
 }
 
-/* MODAL STYLES */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -742,7 +727,6 @@ body {
   display: none !important;
 }
 
-/* Leaflet Layer Switcher Control */
 .leaflet-control-layers {
   background: rgba(18, 24, 36, 0.92) !important;
   backdrop-filter: blur(10px);
@@ -778,10 +762,6 @@ body {
   cursor: pointer;
 }
 
-/* ======================================================================================
-   AUTONOMOUS MISSION PLANNER & MAP HUD EXTENSIONS
-   ====================================================================================== */
-
 .map-view-wrapper {
   position: relative;
   width: 100%;
@@ -793,7 +773,6 @@ body {
   height: 100%;
 }
 
-/* Floating Map HUD */
 .mission-map-hud {
   position: absolute;
   top: 12px;
@@ -912,7 +891,6 @@ body {
   color: var(--accent-red);
 }
 
-/* Modal Large Layout */
 .modal-card.modal-large {
   max-width: 860px;
   width: 95%;
@@ -960,7 +938,6 @@ body {
   padding-bottom: 3px;
 }
 
-/* Pattern Selector Cards */
 .pattern-selector {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1010,7 +987,6 @@ body {
   box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
 }
 
-/* Radio Pill Group */
 .radio-pill-group {
   display: flex;
   gap: 8px;
@@ -1041,7 +1017,6 @@ body {
   font-weight: 700;
 }
 
-/* Form Row Layouts */
 .form-row-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1072,7 +1047,6 @@ body {
   cursor: pointer;
 }
 
-/* Preview Metrics Card */
 .preview-metrics-card {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1108,7 +1082,6 @@ body {
   color: var(--accent-green) !important;
 }
 
-/* Takeoff Info Alert */
 .takeoff-info-alert {
   display: flex;
   gap: 10px;
@@ -1129,7 +1102,6 @@ body {
   font-family: monospace;
 }
 
-/* Modal Actions */
 .modal-actions-container {
   display: flex;
   flex-direction: column;
@@ -1182,7 +1154,6 @@ body {
   color: #fff;
 }
 
-/* Leaflet Map Custom Marker Styles */
 .wp-marker-icon {
   display: flex;
   align-items: center;
