@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drone Mission Control & Telemetry Dashboard</title>
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/style.css" />
+  <!-- Google Fonts: Orbitron & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="dashboard-container">
+    <!-- TOP HEADER -->
+    <header class="top-header">
+      <div class="header-left">
+        <div class="logo-icon">🛸</div>
+        <div>
+          <h1 class="system-title">DRONE MISSION CONTROL</h1>
+          <div class="system-sub">Raspberry Pi 4B &bull; Pixhawk 2.4.8 &bull; TELEM2 (115200)</div>
+        </div>
+      </div>
+
+      <div class="header-status-group">
+        <div class="status-badge" id="badge-arm">DISARMED</div>
+        <div class="status-badge mode-badge" id="badge-mode">DISCONNECTED</div>
+        <div class="status-badge mission-badge" id="badge-mission">STANDBY</div>
+        <div class="conn-indicator online" id="conn-indicator">
+          <span class="dot"></span>
+          <span id="conn-text">LIVE 10Hz</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI STATS CARDS ROW -->
+    <section class="kpi-grid">
+      <!-- 1. BATTERY -->
+      <div class="card kpi-card">
+        <div class="card-header">
+          <span class="card-icon">🔋</span>
+          <span class="card-label">TOTAL BATTERY</span>
+        </div>
+        <div class="kpi-main-val">
+          <span id="val-bat-v">--.--</span><span class="unit">V</span>
+        </div>
+        <div class="kpi-sub-row">
+          <span>Current: <b id="val-bat-a">--.-</b> A</span>
+          <span>Power: <b id="val-bat-w">---</b> W</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="bat-remaining-bar" style="width: 0%"></div>
+        </div>
+        <div class="progress-text"><span id="val-bat-pct">--</span>% Remaining</div>
+      </div>
+
+      <!-- 2. ALTITUDE -->
+      <div class="card kpi-card">
+        <div class="card-header">
+          <span class="card-icon">✈️</span>
+          <span class="card-label">ALTITUDE (AGL)</span>
+        </div>
+        <div class="kpi-main-val">
+          <span id="val-alt-rel">--.-</span><span class="unit">m</span>
+        </div>
+        <div class="kpi-sub-row">
+          <span>MSL: <b id="val-alt-msl">--.-</b> m</span>
+          <span>Climb: <b id="val-climb">--.-</b> m/s</span>
+        </div>
+        <div class="card-footer-tag" id="tag-alt-status">AGL RELATIVE</div>
+      </div>
+
+      <!-- 3. HEADING & ATTITUDE -->
+      <div class="card kpi-card">
+        <div class="card-header">
+          <span class="card-icon">🧭</span>
+          <span class="card-label">HEADING & ATTITUDE</span>
+        </div>
+        <div class="kpi-main-val">
+          <span id="val-heading">---</span><span class="unit">°</span>
+          <span class="card-accent-text" id="val-heading-cardinal">N</span>
+        </div>
+        <div class="kpi-sub-row">
+          <span>Roll: <b id="val-roll">--.-</b>°</span>
+          <span>Pitch: <b id="val-pitch">--.-</b>°</span>
+        </div>
+        <div class="card-footer-tag" id="tag-compass">COMPASS OK</div>
+      </div>
+
+      <!-- 4. SIGNAL & SBC HEALTH -->
+      <div class="card kpi-card">
+        <div class="card-header">
+          <span class="card-icon">📶</span>
+          <span class="card-label">SIGNAL & SBC HEALTH</span>
+        </div>
+        <div class="kpi-main-val">
+          <span id="val-rssi">--</span><span class="unit">%</span>
+        </div>
+        <div class="kpi-sub-row">
+          <span>CPU: <b id="val-sbc-temp">--.-</b>°C</span>
+          <span>Load: <b id="val-sbc-load">--</b>%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill rssi-fill" id="rssi-bar" style="width: 0%"></div>
+        </div>
+        <div class="progress-text">RC Link Strength</div>
+      </div>
+    </section>
+
+    <!-- MAIN DASHBOARD CONTENT (MAP & REAL-TIME CHARTS) -->
+    <main class="main-grid">
+      <!-- LEFT: GPS MAP & GRID SEARCH CONTROLS -->
+      <div class="card map-card">
+        <div class="card-header flex-between">
+          <div class="header-title-group">
+            <span class="card-icon">🗺️</span>
+            <span class="card-title">LIVE GPS SATELLITE TRACKING & AUTONOMOUS MISSION PLANNER</span>
+          </div>
+          <div class="gps-meta-badges">
+            <span class="gps-badge" id="badge-gps-fix">3D FIX</span>
+            <span class="gps-badge" id="badge-gps-sats">16 SATS</span>
+            <span class="gps-badge" id="badge-gps-hdop">HDOP: 0.8</span>
+          </div>
+        </div>
+
+        <!-- Leaflet Map Container & Floating Mission HUD -->
+        <div class="map-view-wrapper">
+          <div id="leaflet-map" class="map-view"></div>
+
+          <!-- Floating Live Mission HUD Overlay on Map -->
+          <div class="mission-map-hud" id="mission-map-hud">
+            <div class="hud-header">
+              <span class="hud-dot" id="hud-dot"></span>
+              <span class="hud-title" id="hud-mission-state">MISSION: STANDBY</span>
+            </div>
+            <div class="hud-body">
+              <div class="hud-row">
+                <span>Waypoint:</span>
+                <b id="hud-wp-tracker">-- / --</b>
+              </div>
+              <div class="hud-row">
+                <span>Distance to WP:</span>
+                <b id="hud-wp-dist">--.- m</b>
+              </div>
+              <div class="hud-progress-bg">
+                <div class="hud-progress-fill" id="hud-progress-fill" style="width: 0%"></div>
+              </div>
+              <div class="hud-quick-actions">
+                <button class="hud-btn hud-btn-start" id="btn-hud-start" title="Start Mission in AUTO">▶️ AUTO</button>
+                <button class="hud-btn hud-btn-pause" id="btn-hud-pause" title="Pause in LOITER">⏸️ LOITER</button>
+                <button class="hud-btn hud-btn-rtl" id="btn-hud-rtl" title="Return to Launch">🚨 RTL</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="map-bottom-bar">
+          <div class="coord-display">
+            <span>LAT: <b id="val-lat">--.------</b></span>
+            <span>LON: <b id="val-lon">--.------</b></span>
+          </div>
+          <div class="map-controls">
+            <button class="btn btn-secondary" id="btn-pick-center">📍 Pick Center on Map</button>
+            <button class="btn btn-secondary" id="btn-recenter">🎯 Recenter</button>
+            <button class="btn btn-primary" id="btn-open-grid-modal">🚀 Mission Planner & Autonomy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: 3-AXIS GYROSCOPE RATES CHART -->
+      <div class="card chart-card">
+        <div class="card-header flex-between">
+          <div class="header-title-group">
+            <span class="card-icon">📊</span>
+            <span class="card-title">3-AXES GYROSCOPE LIVE RATES (deg/s)</span>
+          </div>
+          <div class="chart-legend">
+            <span class="legend-item"><span class="legend-color cyan"></span> Roll Rate (ωx)</span>
+            <span class="legend-item"><span class="legend-color yellow"></span> Pitch Rate (ωy)</span>
+            <span class="legend-item"><span class="legend-color magenta"></span> Yaw Rate (ωz)</span>
+          </div>
+        </div>
+        <div class="canvas-container">
+          <canvas id="gyroChart"></canvas>
+        </div>
+        <div class="accel-footer">
+          <span>Accel X: <b id="val-acc-x">0.00</b> g</span>
+          <span>Accel Y: <b id="val-acc-y">0.00</b> g</span>
+          <span>Accel Z: <b id="val-acc-z">1.00</b> g</span>
+        </div>
+      </div>
+
+      <!-- BOTTOM ROW 1: INDIVIDUAL CELL VOLTAGES -->
+      <div class="card cell-card">
+        <div class="card-header flex-between">
+          <div class="header-title-group">
+            <span class="card-icon">🔋</span>
+            <span class="card-title">INDIVIDUAL CELL VOLTAGES & BALANCE</span>
+          </div>
+          <span class="cell-delta-tag" id="val-cell-delta">ΔV: 0 mV (BALANCED)</span>
+        </div>
+        <div class="cells-grid">
+          <div class="cell-box">
+            <div class="cell-label">CELL 1</div>
+            <div class="cell-voltage" id="val-cell-1">4.20V</div>
+            <div class="cell-bar-bg"><div class="cell-bar-fill" id="cell-bar-1" style="width: 100%"></div></div>
+          </div>
+          <div class="cell-box">
+            <div class="cell-label">CELL 2</div>
+            <div class="cell-voltage" id="val-cell-2">4.20V</div>
+            <div class="cell-bar-bg"><div class="cell-bar-fill" id="cell-bar-2" style="width: 100%"></div></div>
+          </div>
+          <div class="cell-box">
+            <div class="cell-label">CELL 3</div>
+            <div class="cell-voltage" id="val-cell-3">4.20V</div>
+            <div class="cell-bar-bg"><div class="cell-bar-fill" id="cell-bar-3" style="width: 100%"></div></div>
+          </div>
+          <div class="cell-box">
+            <div class="cell-label">CELL 4</div>
+            <div class="cell-voltage" id="val-cell-4">--.--</div>
+            <div class="cell-bar-bg"><div class="cell-bar-fill" id="cell-bar-4" style="width: 0%"></div></div>
+          </div>
+          <div class="cell-box">
+            <div class="cell-label">CELL 5</div>
+            <div class="cell-voltage" id="val-cell-5">--.--</div>
+            <div class="cell-bar-bg"><div class="cell-bar-fill" id="cell-bar-5" style="width: 0%"></div></div>
+          </div>
+          <div class="cell-box">
+            <div class="cell-label">CELL 6</div>
+            <div class="cell-voltage" id="val-cell-6">--.--</div>
+            <div class="cell-bar-bg"><div class="cell-bar-fill" id="cell-bar-6" style="width: 0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTTOM ROW 2: PID ATTITUDE TRACKING -->
+      <div class="card pid-card">
+        <div class="card-header flex-between">
+          <div class="header-title-group">
+            <span class="card-icon">🎯</span>
+            <span class="card-title">PID ATTITUDE TRACKING (TARGET vs ACTUAL)</span>
+          </div>
+          <div class="pid-errors">
+            <span>Roll Err: <b id="val-err-roll">0.0°</b></span>
+            <span>Pitch Err: <b id="val-err-pitch">0.0°</b></span>
+          </div>
+        </div>
+        <div class="canvas-container small-chart">
+          <canvas id="pidChart"></canvas>
+        </div>
+      </div>
+
+      <!-- BOTTOM ROW 3: MOTOR POWER EQUALIZER -->
+      <div class="card motor-card">
+        <div class="card-header">
+          <span class="card-icon">⚡</span>
+          <span class="card-title">MOTOR POWER EQUALIZER (PWM µs / %)</span>
+        </div>
+        <div class="motors-grid">
+          <div class="motor-col">
+            <div class="motor-val" id="val-m1-pct">58%</div>
+            <div class="motor-bar-wrapper">
+              <div class="motor-bar-fill" id="bar-m1" style="height: 58%"></div>
+            </div>
+            <div class="motor-pwm" id="val-m1-pwm">1580µs</div>
+            <div class="motor-name">M1 (FR)</div>
+          </div>
+          <div class="motor-col">
+            <div class="motor-val" id="val-m2-pct">58%</div>
+            <div class="motor-bar-wrapper">
+              <div class="motor-bar-fill" id="bar-m2" style="height: 58%"></div>
+            </div>
+            <div class="motor-pwm" id="val-m2-pwm">1580µs</div>
+            <div class="motor-name">M2 (RL)</div>
+          </div>
+          <div class="motor-col">
+            <div class="motor-val" id="val-m3-pct">58%</div>
+            <div class="motor-bar-wrapper">
+              <div class="motor-bar-fill" id="bar-m3" style="height: 58%"></div>
+            </div>
+            <div class="motor-pwm" id="val-m3-pwm">1580µs</div>
+            <div class="motor-name">M3 (FL)</div>
+          </div>
+          <div class="motor-col">
+            <div class="motor-val" id="val-m4-pct">58%</div>
+            <div class="motor-bar-wrapper">
+              <div class="motor-bar-fill" id="bar-m4" style="height: 58%"></div>
+            </div>
+            <div class="motor-pwm" id="val-m4-pwm">1580µs</div>
+            <div class="motor-name">M4 (RR)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTTOM ROW 4: SBC SYSTEM DIAGNOSTICS -->
+      <div class="card sbc-card">
+        <div class="card-header">
+          <span class="card-icon">💻</span>
+          <span class="card-title">SBC DIAGNOSTICS (RASPBERRY PI 4B)</span>
+        </div>
+        <div class="sbc-stats-list">
+          <div class="sbc-item">
+            <span class="sbc-label">CPU Temperature:</span>
+            <span class="sbc-val" id="sbc-temp-txt">48.5 °C <span class="badge-ok">NORMAL</span></span>
+          </div>
+          <div class="sbc-item">
+            <span class="sbc-label">CPU Utilization:</span>
+            <span class="sbc-val" id="sbc-cpu-txt">24.5 %</span>
+          </div>
+          <div class="sbc-item">
+            <span class="sbc-label">RAM Consumption:</span>
+            <span class="sbc-val" id="sbc-ram-txt">450 MB / 1940 MB (23.2%)</span>
+          </div>
+          <div class="sbc-item">
+            <span class="sbc-label">Storage Free:</span>
+            <span class="sbc-val" id="sbc-disk-txt">18.5 GB (32% used)</span>
+          </div>
+          <div class="sbc-item">
+            <span class="sbc-label">System Uptime:</span>
+            <span class="sbc-val" id="sbc-uptime-txt">0h 45m</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- AUTONOMOUS MISSION PLANNER MODAL -->
+    <div id="grid-modal" class="modal-overlay hidden">
+      <div class="modal-card modal-large">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon">🛸</span>
+            <div>
+              <h2>Autonomous Mission Planner & Grid Generator</h2>
+              <div class="modal-sub">Dynamic Point & Radius Autonomy with Vertical Launch (lat=0, lon=0)</div>
+            </div>
+          </div>
+          <button class="btn-close" id="btn-close-modal">&times;</button>
+        </div>
+
+        <div class="modal-body modal-grid-layout">
+          <!-- LEFT COLUMN: INPUT CONTROLS -->
+          <div class="modal-inputs-col">
+            <!-- 1. Search Pattern Selection -->
+            <div class="section-label">1. SEARCH PATTERN</div>
+            <div class="pattern-selector">
+              <label class="pattern-option">
+                <input type="radio" name="mission-pattern" value="grid" checked>
+                <div class="pattern-card">
+                  <span class="pattern-icon">🌾</span>
+                  <span class="pattern-name">Lawnmower Grid</span>
+                  <span class="pattern-desc">Boustrophedon Serpentine</span>
+                </div>
+              </label>
+              <label class="pattern-option">
+                <input type="radio" name="mission-pattern" value="spiral">
+                <div class="pattern-card">
+                  <span class="pattern-icon">🌀</span>
+                  <span class="pattern-name">Expanding Spiral</span>
+                  <span class="pattern-desc">Outward Box SAR</span>
+                </div>
+              </label>
+              <label class="pattern-option">
+                <input type="radio" name="mission-pattern" value="sector">
+                <div class="pattern-card">
+                  <span class="pattern-icon">🍕</span>
+                  <span class="pattern-name">Sector Search</span>
+                  <span class="pattern-desc">120° Radiating Transects</span>
+                </div>
+              </label>
+            </div>
+
+            <!-- 2. Target Center Location -->
+            <div class="section-label">2. TARGET CENTER POINT</div>
+            <div class="form-group">
+              <div class="radio-pill-group">
+                <label><input type="radio" name="center-mode" value="current" checked> 🛸 Current GPS</label>
+                <label><input type="radio" name="center-mode" value="map"> 📍 Click on Map</label>
+                <label><input type="radio" name="center-mode" value="custom"> ✏️ Manual Lat/Lon</label>
+              </div>
+            </div>
+
+            <div id="custom-coords-group" class="form-row-2">
+              <div class="form-group">
+                <label>Latitude:</label>
+                <input type="number" step="0.000001" id="input-custom-lat" value="12.971598">
+              </div>
+              <div class="form-group">
+                <label>Longitude:</label>
+                <input type="number" step="0.000001" id="input-custom-lon" value="77.594562">
+              </div>
+            </div>
+
+            <!-- 3. Search Radius Slider -->
+            <div class="section-label">3. SEARCH RADIUS & SPACING</div>
+            <div class="form-group">
+              <div class="slider-header">
+                <label>Search Radius:</label>
+                <span class="slider-val-badge"><b id="val-radius-label">50</b> meters</span>
+              </div>
+              <input type="range" id="input-radius-slider" min="10" max="500" step="5" value="50" class="styled-slider">
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label>Lane Spacing / Sweep (m):</label>
+                <input type="number" id="input-spacing" value="10" min="4" max="50">
+              </div>
+              <div class="form-group">
+                <label>Grid Angle (° Rotation):</label>
+                <input type="number" id="input-angle" value="0" min="0" max="360" step="5">
+              </div>
+            </div>
+
+            <!-- 4. Flight Dynamics & Safety -->
+            <div class="section-label">4. FLIGHT DYNAMICS & END ACTION</div>
+            <div class="form-row-3">
+              <div class="form-group">
+                <label>Altitude (m AGL):</label>
+                <input type="number" id="input-altitude" value="15" min="5" max="100">
+              </div>
+              <div class="form-group">
+                <label>Speed (m/s):</label>
+                <input type="number" id="input-speed" value="5" min="1" max="15">
+              </div>
+              <div class="form-group">
+                <label>End Action:</label>
+                <select id="input-end-action">
+                  <option value="RTL">Return to Launch (RTL)</option>
+                  <option value="LAND">Land at Last Point</option>
+                  <option value="LOITER">Hold / Loiter in Place</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: PREVIEW STATS & ACTION HUB -->
+          <div class="modal-preview-col">
+            <div class="section-label">5. ROUTE ANALYTICS & PREVIEW</div>
+
+            <div class="preview-metrics-card">
+              <div class="preview-stat-item">
+                <span class="stat-label">WAYPOINTS</span>
+                <span class="stat-val" id="stat-wp-count">--</span>
+              </div>
+              <div class="preview-stat-item">
+                <span class="stat-label">TOTAL DISTANCE</span>
+                <span class="stat-val" id="stat-total-dist">-- m</span>
+              </div>
+              <div class="preview-stat-item">
+                <span class="stat-label">EST. FLIGHT TIME</span>
+                <span class="stat-val" id="stat-est-time">--m --s</span>
+              </div>
+              <div class="preview-stat-item">
+                <span class="stat-label">TAKEOFF MODE</span>
+                <span class="stat-val text-green">Dynamic (0,0)</span>
+              </div>
+            </div>
+
+            <div class="takeoff-info-alert">
+              <span class="info-icon">ℹ️</span>
+              <div class="info-text">
+                <b>Dynamic Launch Guarantee:</b> Takeoff command uses <code>(0,0)</code> coordinates with relative altitude. Pixhawk ascends vertically from wherever it sits on the ground before flying to Waypoint 1.
+              </div>
+            </div>
+
+            <div id="mission-alert-box" class="alert-box hidden"></div>
+
+            <div class="modal-actions-container">
+              <button class="btn btn-secondary btn-full" id="btn-preview-mission">👁️ Preview Route on Map</button>
+              <button class="btn btn-primary btn-full" id="btn-submit-grid">🚀 Upload Mission to Pixhawk</button>
+              <div class="modal-sub-actions">
+                <button class="btn btn-success" id="btn-modal-start">▶️ Start Mission (AUTO)</button>
+                <button class="btn btn-warning" id="btn-modal-pause">⏸️ Pause (LOITER)</button>
+                <button class="btn btn-danger" id="btn-modal-abort">🚨 Abort (RTL)</button>
+                <button class="btn btn-secondary" id="btn-modal-clear">🗑️ Clear</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-cancel-modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet Map JS & Chart.js -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
