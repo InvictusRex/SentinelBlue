@@ -13,6 +13,9 @@ The project is designed around a reproducible computer vision pipeline that eval
 
 ## Technical Objective
 
+
+
+
 The engineering objectives of SentinelBlue are centered around developing a reliable, deployment-ready maritime SAR perception system that balances detection performance with embedded inference efficiency. The project is specifically designed to:
 
 - Maximize **person detection recall**, ensuring distressed individuals remain the highest-priority detection target.
