@@ -51,12 +51,10 @@ export interface FlightState {
 export interface SbcState {
   cpu: number;
   cores: number[];
-  memUsed: number;
-  memTotal: number;
+  memPercent: number;
   temp: number;
   uptime: number;
-  diskUsed: number;
-  diskTotal: number;
+  diskPercent: number;
   load: [number, number, number];
 }
 
@@ -88,8 +86,18 @@ export interface GyroPoint {
   z: number;
 }
 
+export type TelemetrySourceStatus = "online" | "stale" | "offline";
+
+export interface TelemetrySource {
+  status: TelemetrySourceStatus;
+  endpoint: string;
+  message: string;
+  lastUpdated: number;
+}
+
 export interface Telemetry {
   clock: number;
+  source: TelemetrySource;
   battery: BatteryState;
   nav: NavState;
   altitude: AltitudeState;

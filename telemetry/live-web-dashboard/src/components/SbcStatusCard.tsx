@@ -23,8 +23,7 @@ function MetricRow({ label, value, pct, color }: { label: string; value: string;
 
 export function SbcStatusCard({ sbc, className }: { sbc: SbcState; className?: string }) {
   const tempTone = sbc.temp > 70 ? "#f2555a" : sbc.temp > 62 ? "#f5a524" : "#3fcf8e";
-  const memPct = (sbc.memUsed / sbc.memTotal) * 100;
-  const diskPct = (sbc.diskUsed / sbc.diskTotal) * 100;
+  const [cpuUsage, memoryUsage, storageUsage] = sbc.load;
 
   return (
     <Panel
@@ -41,28 +40,32 @@ export function SbcStatusCard({ sbc, className }: { sbc: SbcState; className?: s
     >
       <div className="grid grid-cols-2 gap-x-3 gap-y-2">
         <MetricRow label="CPU" value={`${sbc.cpu.toFixed(0)}%`} pct={sbc.cpu} color={sbc.cpu > 80 ? "#f2555a" : "#4c8dff"} />
-        <MetricRow label="Memory" value={`${sbc.memUsed.toFixed(1)} / ${sbc.memTotal} GB`} pct={memPct} color="#2dd4bf" />
+        <MetricRow label="Memory" value={`${sbc.memPercent.toFixed(0)}%`} pct={sbc.memPercent} color="#2dd4bf" />
         <MetricRow label="Temp" value={`${sbc.temp.toFixed(1)} °C`} pct={((sbc.temp - 30) / 55) * 100} color={tempTone} />
-        <MetricRow label="Storage" value={`${sbc.diskUsed.toFixed(1)} / ${sbc.diskTotal} GB`} pct={diskPct} color="#9b8cff" />
+        <MetricRow label="Storage" value={`${sbc.diskPercent.toFixed(0)}%`} pct={sbc.diskPercent} color="#9b8cff" />
       </div>
 
       <div className="flex items-end justify-between gap-2 border-t border-hud-line pt-2">
         <div className="flex items-end gap-1">
-          {sbc.cores.map((core, i) => (
-            <div key={i} className="flex flex-col items-center gap-1">
-              <div className="flex h-6 w-2.5 items-end rounded-sm bg-hud-raise">
-                <span
-                  className="w-full rounded-sm transition-[height] duration-200 ease-out"
-                  style={{ height: `${core}%`, backgroundColor: core > 85 ? "#f5a524" : "#4c8dff" }}
-                />
+          {sbc.cores.map((core, i) => {
+            const height = core > 0 ? Math.max(8, core) : 0;
+
+            return (
+              <div key={i} className="flex flex-col items-center gap-1">
+                <div className="flex h-6 w-2.5 items-end rounded-sm bg-hud-raise">
+                  <span
+                    className="w-full rounded-sm transition-[height] duration-200 ease-out"
+                    style={{ height: `${height}%`, backgroundColor: core > 85 ? "#f5a524" : "#4c8dff" }}
+                  />
+                </div>
+                <span className="font-mono text-[8px] text-hud-faint">C{i}</span>
               </div>
-              <span className="font-mono text-[8px] text-hud-faint">C{i}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div className="text-right">
           <div className="tabular font-mono text-[11px] text-hud-dim">
-            load {sbc.load.map((l) => l.toFixed(2)).join(" ")}
+            usage cpu {cpuUsage.toFixed(0)}% mem {memoryUsage.toFixed(0)}% disk {storageUsage.toFixed(0)}%
           </div>
           <div className="tabular font-mono text-2xs text-hud-faint">uptime {formatUptime(sbc.uptime)}</div>
         </div>

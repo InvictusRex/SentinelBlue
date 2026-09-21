@@ -13,8 +13,8 @@ export function LinkCard({ link, className }: { link: LinkState; className?: str
       bodyClassName="flex flex-col justify-between gap-2"
     >
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-        <Stat label="RSSI" value={link.rssi} unit="dBm" />
-        <Stat label="Pkt/s" value={Math.round(link.rate)} />
+        <Stat label="RSSI" value={link.rssi} unit="%" />
+        <Stat label="Quality" value={Math.round(link.rate)} unit="%" />
         <Stat label="Loss" value={`${link.loss.toFixed(1)}%`} tone={link.loss < 3 ? "text-hud-text" : "text-sig-amber"} />
         <Stat label="Latency" value={link.latency} unit="ms" />
       </div>
