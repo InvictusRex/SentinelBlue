@@ -3,7 +3,7 @@ import { Chip, Panel, Stat } from "./Panel";
 import type { LinkState } from "../types/telemetry";
 
 export function LinkCard({ link, className }: { link: LinkState; className?: string }) {
-  const healthy = link.loss < 3 && link.rssi > -78;
+  const healthy = link.loss < 3 && link.rssi > 45;
   return (
     <Panel
       label="Downlink · ESP32"

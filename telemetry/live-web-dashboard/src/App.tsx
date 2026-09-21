@@ -195,8 +195,8 @@ export function App({ streaming = true }: { streaming?: boolean }) {
             className="h-[196px]"
             footer={
               <>
-                <span>err · deg · 60 s window</span>
-                <span>rate 50 hz</span>
+                <span>err · deg · 64 s window</span>
+                <span>rate 1 hz</span>
               </>
             }
           />
