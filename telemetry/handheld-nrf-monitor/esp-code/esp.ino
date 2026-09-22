@@ -59,11 +59,31 @@
 #define FRAME_ATTITUDE 2
 #define FRAME_MOTORS 3
 
-const char* WIFI_STA_SSID = "gamma";
-const char* WIFI_STA_PASSWORD = "gammared";
-const char* WIFI_HOSTNAME = "drone-esp32";
-const char* WIFI_FALLBACK_AP_SSID = "DroneTelemetryESP32";
-const char* WIFI_FALLBACK_AP_PASSWORD = "drone12345";
+#ifndef DRONE_WIFI_STA_SSID
+#define DRONE_WIFI_STA_SSID ""
+#endif
+
+#ifndef DRONE_WIFI_STA_PASSWORD
+#define DRONE_WIFI_STA_PASSWORD ""
+#endif
+
+#ifndef DRONE_WIFI_HOSTNAME
+#define DRONE_WIFI_HOSTNAME "drone-esp32"
+#endif
+
+#ifndef DRONE_WIFI_FALLBACK_AP_SSID
+#define DRONE_WIFI_FALLBACK_AP_SSID "DroneTelemetryESP32"
+#endif
+
+#ifndef DRONE_WIFI_FALLBACK_AP_PASSWORD
+#define DRONE_WIFI_FALLBACK_AP_PASSWORD ""
+#endif
+
+const char* WIFI_STA_SSID = DRONE_WIFI_STA_SSID;
+const char* WIFI_STA_PASSWORD = DRONE_WIFI_STA_PASSWORD;
+const char* WIFI_HOSTNAME = DRONE_WIFI_HOSTNAME;
+const char* WIFI_FALLBACK_AP_SSID = DRONE_WIFI_FALLBACK_AP_SSID;
+const char* WIFI_FALLBACK_AP_PASSWORD = DRONE_WIFI_FALLBACK_AP_PASSWORD;
 const uint16_t HTTP_PORT = 80;
 
 struct __attribute__((packed)) TelemetryPacket {
@@ -716,12 +736,25 @@ void handleOptions() {
 }
 
 bool hasStationCredentials() {
-  return strlen(WIFI_STA_SSID) > 0 &&
-         strcmp(WIFI_STA_SSID, "YOUR_WIFI_SSID") != 0 &&
-         strcmp(WIFI_STA_PASSWORD, "YOUR_WIFI_PASSWORD") != 0;
+  return strlen(WIFI_STA_SSID) > 0 && strlen(WIFI_STA_PASSWORD) > 0;
+}
+
+bool hasFallbackAccessPointCredentials() {
+  return strlen(WIFI_FALLBACK_AP_SSID) > 0 &&
+         strlen(WIFI_FALLBACK_AP_PASSWORD) >= 12 &&
+         strcmp(WIFI_FALLBACK_AP_PASSWORD, "CHANGE_ME") != 0;
 }
 
 void startFallbackAccessPoint() {
+  if (!hasFallbackAccessPointCredentials()) {
+    g_wifiApMode = false;
+    g_wifiIpText = "NO WIFI";
+    WiFi.mode(WIFI_OFF);
+    Serial.println(F("[WIFI] Fallback AP disabled. Define DRONE_WIFI_FALLBACK_AP_PASSWORD with a per-device strong password."));
+    drawWifiStatusScreen(F("WIFI NOT CONFIG"), "NO CREDENTIALS", g_wifiIpText);
+    return;
+  }
+
   g_wifiApMode = true;
   WiFi.mode(WIFI_AP);
   WiFi.softAP(WIFI_FALLBACK_AP_SSID, WIFI_FALLBACK_AP_PASSWORD);
@@ -768,6 +801,11 @@ void setupWifiApi() {
   } else {
     Serial.println(F("[WIFI] Station credentials not set. Starting fallback AP."));
     startFallbackAccessPoint();
+  }
+
+  if (g_wifiIpText == "NO WIFI") {
+    Serial.println(F("[HTTP] Telemetry JSON disabled until Wi-Fi credentials are configured."));
+    return;
   }
 
   server.on("/", HTTP_GET, handleRoot);

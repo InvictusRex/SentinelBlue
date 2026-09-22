@@ -12,7 +12,7 @@ type TopBarProps = {
 };
 
 function stamp(clock: number): string {
-  const total = clock * 4;
+  const total = clock;
   const h = String(Math.floor(total / 3600) % 24).padStart(2, "0");
   const m = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
   const s = String(total % 60).padStart(2, "0");

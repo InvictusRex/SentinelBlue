@@ -3,7 +3,7 @@ import { Chip, Panel, Stat } from "./Panel";
 import type { NavState } from "../types/telemetry";
 
 function SignalBars({ rssi }: { rssi: number }) {
-  const level = rssi > -60 ? 4 : rssi > -68 ? 3 : rssi > -75 ? 2 : 1;
+  const level = rssi >= 75 ? 4 : rssi >= 50 ? 3 : rssi >= 25 ? 2 : rssi > 0 ? 1 : 0;
   return (
     <div className="flex items-end gap-0.5" aria-hidden="true">
       {[1, 2, 3, 4].map((i) => (
@@ -60,7 +60,7 @@ export function NavSignalBox({ nav, className }: { nav: NavState; className?: st
         <Stat label="Hdg" value={`${Math.round(nav.heading)}°`} />
         <Stat label="Sats" value={nav.sats} tone={nav.sats >= 12 ? "text-sig-green" : "text-sig-amber"} />
         <Stat label="HDOP" value={nav.hdop.toFixed(2)} tone={nav.hdop < 1.1 ? "text-hud-text" : "text-sig-amber"} />
-        <Stat label="RSSI" value={nav.rssi} unit="dBm" />
+        <Stat label="RSSI" value={nav.rssi} unit="%" />
       </div>
       <Compass heading={nav.heading} />
     </Panel>

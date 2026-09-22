@@ -309,19 +309,23 @@ export function useTelemetry(live: boolean, endpoint: string): Telemetry {
     let stopped = false;
     let failures = 0;
     let timer: number | undefined;
+    let activeController: AbortController | null = null;
 
     const poll = async () => {
       const controller = new AbortController();
+      activeController = controller;
       const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       const startedAt = performance.now();
       try {
         const response = await fetch(endpoint, { cache: "no-store", signal: controller.signal });
         if (!response.ok) throw new Error(`http ${response.status}`);
         const raw = (await response.json()) as RawTelemetry;
+        if (stopped) return;
         const latencyMs = Math.max(0, Math.round(performance.now() - startedAt));
         failures = 0;
         setState((prev) => fromLive(prev, raw, endpoint, latencyMs));
       } catch (error) {
+        if (stopped) return;
         failures += 1;
         const detail = errorText(error);
         setState((prev) =>
@@ -331,6 +335,9 @@ export function useTelemetry(live: boolean, endpoint: string): Telemetry {
         );
       } finally {
         window.clearTimeout(timeout);
+        if (activeController === controller) {
+          activeController = null;
+        }
         if (!stopped) {
           timer = window.setTimeout(() => void poll(), POLL_MS);
         }
@@ -340,6 +347,7 @@ export function useTelemetry(live: boolean, endpoint: string): Telemetry {
     void poll();
     return () => {
       stopped = true;
+      activeController?.abort();
       if (timer !== undefined) window.clearTimeout(timer);
     };
   }, [live, endpoint]);

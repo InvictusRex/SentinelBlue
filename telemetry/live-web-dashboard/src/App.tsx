@@ -82,7 +82,7 @@ function ConnectionPanel({
           </span>
           <div className="min-w-0">
             <h1 className="text-sm font-semibold uppercase tracking-[0.08em] text-hud-text">Connect ESP32 Telemetry</h1>
-            <p className="mt-1 text-xs leading-5 text-hud-muted">Enter the IP shown on the ESP32 OLED.</p>
+            <p className="mt-1 text-xs leading-5 text-hud-dim">Enter the IP shown on the ESP32 OLED.</p>
           </div>
         </div>
 
@@ -109,7 +109,7 @@ function ConnectionPanel({
 
         {error ? <p className="mt-3 font-mono text-2xs uppercase tracking-[0.08em] text-sig-red">{error}</p> : null}
 
-        <div className="mt-4 rounded border border-hud-line bg-hud-bg/70 p-3 font-mono text-2xs leading-5 text-hud-muted">
+        <div className="mt-4 rounded border border-hud-line bg-hud-bg/70 p-3 font-mono text-2xs leading-5 text-hud-dim">
           <div>Example: 10.160.142.17</div>
           <div>Dashboard will read: http://&lt;esp-ip&gt;/telemetry.json</div>
         </div>
@@ -252,7 +252,7 @@ export function App({ streaming = true }: { streaming?: boolean }) {
           </span>
           <button
             type="button"
-            className="hidden rounded border border-hud-line px-2 py-1 uppercase tracking-[0.12em] text-hud-muted transition hover:border-teal-300/50 hover:text-teal-200 sm:block"
+            className="hidden rounded border border-hud-line px-2 py-1 uppercase tracking-[0.12em] text-hud-dim transition hover:border-teal-300/50 hover:text-teal-200 sm:block"
             onClick={() => {
               setLive(false);
               setEndpoint("");
