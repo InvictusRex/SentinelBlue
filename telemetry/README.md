@@ -4,40 +4,84 @@ Telemetry contains the drone companion-computer code, handheld ground receiver f
 
 ## Directory Layout
 
-- `handheld-nrf-monitor/` - Raspberry Pi and ESP32 code for collecting Pixhawk telemetry and sending the compact NRF24L01+ stream to the handheld receiver.
-- `live-web-dashboard/` - Static web dashboard files served by the Raspberry Pi companion computer.
+- `handheld-nrf-monitor/` - Raspberry Pi and ESP32 code for collecting Pixhawk telemetry and sending the compact NRF24L01+ stream to the ESP32 receiver.
+- `live-web-dashboard/` - Vite React dashboard source. Run it on a laptop/static host and connect it to the ESP32 `/telemetry.json` endpoint shown on the OLED.
 
 ## File Guide
 
-### `handheld-nrf-monitor/esp_code/esp.ino`
-ESP32 receiver firmware for the handheld unit. It listens for NRF24L01+ telemetry packets, validates the packet checksum, decodes battery/GPS/altitude/RSSI values, and renders them on the SH1106 OLED.
+### `handheld-nrf-monitor/esp-code/esp.ino`
+ESP32 receiver firmware for the handheld unit. It listens for NRF24L01+ telemetry packets, validates frame checksums, decodes battery/GPS/altitude/attitude/SBC values, renders them on the SH1106 OLED, connects to Wi-Fi, and exposes the latest packet as JSON at `/telemetry.json`.
 
-### `handheld-nrf-monitor/pi_code/main.py`
-Entry point for the Raspberry Pi companion server. It starts the MAVLink manager, SBC monitor, web dashboard server, NRF24L01+ transmitter, and autonomous grid-search module.
+### `handheld-nrf-monitor/pi-code/main.py`
+Entry point for the Raspberry Pi telemetry relay. It starts the MAVLink manager, SBC monitor, and NRF24L01+ transmitter. The laptop dashboard reads the ESP32 Wi-Fi JSON endpoint.
 
-### `handheld-nrf-monitor/pi_code/modules/mavlink_manager.py`
-Manages the Pixhawk MAVLink connection or simulator, keeps the shared telemetry state, sends vehicle commands, uploads missions, and tracks mission progress.
+### `handheld-nrf-monitor/pi-code/mavlink_manager.py`
+Manages the Pixhawk MAVLink connection or simulator and keeps the shared telemetry state used by the NRF transmitter.
 
-### `handheld-nrf-monitor/pi_code/modules/radio_tx_module.py`
-Packs selected telemetry into the 20-byte NRF24L01+ payload and broadcasts it to the ESP32 handheld receiver.
+### `handheld-nrf-monitor/pi-code/radio_tx_module.py`
+Packs selected telemetry into typed NRF24L01+ frames and broadcasts them to the ESP32 handheld receiver.
 
-### `handheld-nrf-monitor/pi_code/modules/web_dashboard_module.py`
-Runs the HTTP/WebSocket server, serves the dashboard from `live-web-dashboard/`, exposes telemetry APIs, and forwards mission-control requests to the grid-search module.
-
-### `handheld-nrf-monitor/pi_code/modules/grid_search_module.py`
-Builds autonomous search missions, including grid, spiral, and sector patterns, and converts planned routes into MAVLink mission items.
-
-### `handheld-nrf-monitor/pi_code/modules/sbc_monitor.py`
+### `handheld-nrf-monitor/pi-code/sbc_monitor.py`
 Reads Raspberry Pi CPU, memory, disk, thermal, and uptime metrics for dashboard telemetry.
 
-### `handheld-nrf-monitor/pi_code/modules/__init__.py`
-Marks the `modules` directory as a Python package.
-
 ### `live-web-dashboard/index.html`
-Dashboard markup for live telemetry, map tracking, mission planning, battery status, charts, motor outputs, and SBC diagnostics.
+Vite entrypoint used during development and build. Production/static deployments should serve the generated `dist/index.html`.
 
-### `live-web-dashboard/style.css`
-Dashboard styling for the mission-control layout, map panel, cards, modal controls, charts, and telemetry status states.
+### `live-web-dashboard/src/`
+React and TypeScript dashboard source for telemetry panels, charts, attitude view, and ESP JSON polling.
 
-### `live-web-dashboard/app.js`
-Dashboard client logic for WebSocket telemetry updates, Leaflet map rendering, chart updates, route previews, and mission-control API calls.
+### `live-web-dashboard/package.json`
+Defines the Vite development, build, and preview commands for the dashboard.
+
+### `live-web-dashboard/dist/`
+Generated production dashboard output from `npm run build`. This directory is ignored by Git and should be served from a laptop/static host.
+
+## Running the Telemetry Relay
+
+On the Raspberry Pi:
+
+```bash
+cd telemetry/handheld-nrf-monitor/pi-code
+python3 main.py --port /dev/serial0 --baud 115200 --radio-rate 5
+```
+
+## Running the Web Dashboard
+
+From `telemetry/live-web-dashboard` on the laptop or static-host machine:
+
+```bash
+npm ci
+npm run dev -- --host 0.0.0.0
+```
+
+Open the dashboard URL and enter the ESP32 IP shown on the OLED. The dashboard reads:
+
+```text
+http://<esp-ip>/telemetry.json
+```
+
+For a production/static build:
+
+```bash
+npm run build
+npm run preview -- --host 0.0.0.0
+```
+
+The Raspberry Pi does not serve the React dashboard in this telemetry flow.
+
+## Mission Control
+
+Mission planning, grid-search, and `/api/mission/*` control endpoints are intentionally out of scope for this telemetry dashboard update. They should live in a separate mission-control module or PR so the telemetry relay remains focused on Pixhawk MAVLink input, NRF24 transmission, ESP32 JSON output, and laptop dashboard display.
+
+## ESP32 Wi-Fi Credentials
+
+Do not commit Wi-Fi secrets into `esp.ino`. Provide them as build-time defines or through your local Arduino/PlatformIO environment:
+
+```bash
+-DDRONE_WIFI_STA_SSID=\"your-network\"
+-DDRONE_WIFI_STA_PASSWORD=\"your-password\"
+-DDRONE_WIFI_FALLBACK_AP_SSID=\"DroneTelemetryESP32-001\"
+-DDRONE_WIFI_FALLBACK_AP_PASSWORD=\"per-device-strong-password\"
+```
+
+The fallback AP is disabled unless `DRONE_WIFI_FALLBACK_AP_PASSWORD` is set to a per-device password of at least 12 characters.

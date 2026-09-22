@@ -1,75 +1,72 @@
 #!/usr/bin/env python3
+"""
+======================================================================================
+Project: Drone Telemetry Master Companion Server
+File: pi/tele/main.py
 
-import os
-import sys
+Description:
+  Telemetry-only supervisor running directly on the Raspberry Pi 4B.
+  Reads Pixhawk MAVLink, packages telemetry, and broadcasts NRF24 frames to
+  the ESP32. The laptop dashboard reads the ESP32 Wi-Fi JSON endpoint.
+======================================================================================
+"""
+
 import time
 import signal
 import argparse
+import sys
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, SCRIPT_DIR)
-
-from modules.sbc_monitor import SBCMonitor
-from modules.mavlink_manager import MAVLinkManager
-from modules.radio_tx_module import RadioTXModule
-from modules.web_dashboard_module import WebDashboardModule
-from modules.grid_search_module import GridSearchModule
+from sbc_monitor import SBCMonitor
+from mavlink_manager import MAVLinkManager
+from radio_tx_module import RadioTXModule
 
 def main():
-    parser = argparse.ArgumentParser(description="Drone Telemetry Master Companion Server")
+    parser = argparse.ArgumentParser(description="Drone Telemetry Pi Relay")
     parser.add_argument("--port", default="/dev/serial0", help="Pixhawk serial port (default: /dev/serial0 or /dev/ttyACM0)")
     parser.add_argument("--baud", type=int, default=115200, help="Serial baud rate (default: 115200)")
-    parser.add_argument("--web-port", type=int, default=8000, help="Web Dashboard HTTP Port (default: 8000)")
     parser.add_argument("--radio-rate", type=float, default=5.0, help="NRF24 broadcast rate in Hz (default: 5.0)")
     parser.add_argument("--no-radio", action="store_true", help="Disable NRF24 radio module")
     parser.add_argument("--simulate", action="store_true", help="Run simulated flight telemetry without hardware")
     args = parser.parse_args()
 
     print("=" * 76)
-    print("        DRONE TELEMETRY MASTER COMPANION SERVER (RASPBERRY PI 4B)       ")
+    print("             DRONE TELEMETRY PI RELAY (RASPBERRY PI 4B)                 ")
     print("=" * 76)
     print(f"[*] Flight Controller Port:  {args.port} @ {args.baud} baud")
-    print(f"[*] Web Dashboard Port:      http://0.0.0.0:{args.web_port}")
+    print("[*] Web Dashboard:           laptop/static host reads ESP32 Wi-Fi JSON")
     print(f"[*] Radio TX Broadcast Rate: {args.radio_rate} Hz ({'DISABLED' if args.no_radio else 'ENABLED'})")
     print(f"[*] Operation Mode:          {'SIMULATION' if args.simulate else 'LIVE PIXHAWK'}")
     print("----------------------------------------------------------------------------")
 
+    # 1. SBC Monitor
     sbc_monitor = SBCMonitor()
     print("[+] Initialized SBC Hardware & Thermal Monitor.")
 
+    # 2. Shared MAVLink Manager
     mav_manager = MAVLinkManager(port=args.port, baud=args.baud, simulate=args.simulate)
     mav_manager.start()
 
-    grid_module = GridSearchModule(mav_manager)
-    print("[✓] Module 3 (Grid Search Autonomy): Ready.")
-
-    dashboard_module = WebDashboardModule(
-        mav_manager=mav_manager,
-        sbc_monitor=sbc_monitor,
-        grid_module=grid_module,
-        port=args.web_port
-    )
-    dashboard_module.start()
-
+    # 3. NRF24 Radio Transmitter
     radio_module = RadioTXModule(
         mav_manager=mav_manager,
+        sbc_monitor=sbc_monitor,
         rate_hz=args.radio_rate,
         enabled=not args.no_radio
     )
     radio_module.start()
 
     print("\n" + "=" * 76)
-    print(f"   ALL 3 MODULES RUNNING CONCURRENTLY ON RASPBERRY PI!")
-    print(f"  • Module 1 (Radio TX):        NRF24L01+ broadcast -> ESP32 Handheld OLED")
-    print(f"  • Module 2 (Web Dashboard):   http://0.0.0.0:{args.web_port}")
-    print(f"  • Module 3 (Grid Autonomy):   Boustrophedon generator & MAVLink controller")
+    print(f"  TELEMETRY RELAY RUNNING ON RASPBERRY PI")
+    print(f"  • MAVLink Input:              Pixhawk -> {args.port}")
+    print(f"  • NRF24 TX:                   Raspberry Pi -> ESP32 Handheld OLED")
+    print(f"  • ESP32 Wi-Fi JSON:           http://<esp-ip>/telemetry.json -> laptop web/")
     print("=" * 76 + "\n")
     print("[*] Press Ctrl+C to stop all services.\n")
 
+    # Graceful exit handler
     def shutdown(signum, frame):
-        print("\n[*] Stopping companion modules...")
+        print("\n[*] Stopping telemetry relay...")
         radio_module.stop()
-        dashboard_module.stop()
         mav_manager.stop()
         print("[✓] All modules stopped cleanly.")
         sys.exit(0)
@@ -77,6 +74,7 @@ def main():
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
+    # Supervisor keep-alive & live console status ticker (every 2s)
     last_print = 0
     while True:
         time.sleep(0.5)
