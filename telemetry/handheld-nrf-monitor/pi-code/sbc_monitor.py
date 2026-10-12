@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+"""
+======================================================================================
+Module: Raspberry Pi SBC Health & Hardware Monitor
+File: pi/tele/sbc_monitor.py
+
+Description:
+  Extracts real-time Single Board Computer (SBC) performance metrics directly from
+  Linux /proc and /sys filesystems (zero mandatory external dependencies):
+  - CPU Core Temperature (°C)
+  - CPU Utilization (%)
+  - RAM Total, Used, and Usage (%)
+  - Disk Total, Used, and Usage (%)
+  - System Uptime (seconds)
+======================================================================================
+"""
 
 import os
 import time
@@ -22,7 +37,7 @@ class SBCMonitor:
             pass
 
     def get_cpu_temp(self) -> float:
-
+        """Reads Raspberry Pi CPU temperature in Celsius."""
         for path in ["/sys/class/thermal/thermal_zone0/temp", "/sys/devices/virtual/thermal/thermal_zone0/temp"]:
             if os.path.exists(path):
                 try:
@@ -34,7 +49,7 @@ class SBCMonitor:
         return 46.5
 
     def get_cpu_load(self) -> float:
-
+        """Calculates instantaneous CPU load percentage."""
         try:
             with open("/proc/stat", "r") as f:
                 fields = [float(x) for x in f.readline().strip().split()[1:]]
@@ -55,7 +70,7 @@ class SBCMonitor:
         return 18.5
 
     def get_ram_usage(self):
-
+        """Returns RAM (used_mb, total_mb, percent)."""
         try:
             meminfo = {}
             with open("/proc/meminfo", "r") as f:
@@ -80,7 +95,7 @@ class SBCMonitor:
         return 420, 1940, 21.6
 
     def get_disk_usage(self):
-
+        """Returns disk usage percentage and free GB."""
         try:
             total, used, free = shutil.disk_usage("/")
             percent = round((used / total) * 100.0, 1)
@@ -90,7 +105,7 @@ class SBCMonitor:
             return 32.0, 18.5
 
     def get_uptime(self) -> int:
-
+        """Returns system uptime in seconds."""
         try:
             with open("/proc/uptime", "r") as f:
                 return int(float(f.readline().split()[0]))
@@ -98,7 +113,7 @@ class SBCMonitor:
             return 3600
 
     def get_metrics_snapshot(self) -> dict:
-
+        """Aggregates all SBC metrics into a dictionary."""
         used_mb, total_mb, ram_percent = self.get_ram_usage()
         disk_percent, disk_free_gb = self.get_disk_usage()
 
