@@ -69,6 +69,25 @@ npm run preview -- --host 0.0.0.0
 
 The Raspberry Pi does not serve the React dashboard in this telemetry flow.
 
+## Running the Web Dashboard with Docker
+
+Install Docker Desktop with its Linux container backend, then run this from
+`telemetry/live-web-dashboard`:
+
+```bash
+docker compose up --build -d
+```
+
+The production build is served at `http://localhost:8080` on the Docker host.
+Other devices on the same network can use `http://<docker-host-ip>:8080` if the
+host firewall allows inbound TCP port 8080. Stop it with `docker compose down`.
+
+The dashboard still reads `http://<esp-ip>/telemetry.json` directly from each
+viewer's browser. A viewer must be able to reach the ESP32 on the network. For
+access from outside the local network, deploy the image on a reachable host
+with HTTPS and a suitable telemetry access path; publishing Docker port 8080
+alone does not make the ESP32 endpoint reachable over the Internet.
+
 ## Mission Control
 
 Mission planning, grid-search, and `/api/mission/*` control endpoints are intentionally out of scope for this telemetry dashboard update. They should live in a separate mission-control module or PR so the telemetry relay remains focused on Pixhawk MAVLink input, NRF24 transmission, ESP32 JSON output, and laptop dashboard display.
