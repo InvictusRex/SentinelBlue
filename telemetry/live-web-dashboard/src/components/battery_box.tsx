@@ -1,5 +1,5 @@
 import { BatteryMediumIcon } from "lucide-react";
-import { Bar, Chip, Panel } from "./Panel";
+import { Bar, Chip, Panel } from "./panel";
 import type { BatteryState } from "../types/telemetry";
 
 function cellTone(v: number): string {

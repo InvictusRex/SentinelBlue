@@ -14,8 +14,16 @@ body,
 body {
   margin: 0;
   background-color: #080b10;
-  color: #e3eaf2;
+  color: #ffffff;
   -webkit-font-smoothing: antialiased;
+}
+
+::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+[class*="text-sig-"] {
+  color: #ffffff;
 }
 
 .tabular {

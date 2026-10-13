@@ -18,15 +18,17 @@ type TelemetryChartProps = {
 export function TelemetryChart({ data, series, domain = ["auto", "auto"], ticks, unit }: TelemetryChartProps) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+      <LineChart data={data} margin={{ top: 8, right: 4, bottom: 8, left: 0 }}>
         <CartesianGrid stroke="#18212c" strokeDasharray="2 4" vertical={false} />
         <YAxis
           domain={domain}
           ticks={ticks}
+          interval={0}
+          allowDataOverflow
           width={34}
           tickLine={false}
           axisLine={false}
-          tick={{ fill: "#5c6a7a", fontSize: 9, fontFamily: "JetBrains Mono" }}
+          tick={{ fill: "#ffffff", fontSize: 9, fontFamily: "JetBrains Mono" }}
           tickFormatter={(v: number) => `${v}${unit ?? ""}`}
         />
         {series.map((s) => (

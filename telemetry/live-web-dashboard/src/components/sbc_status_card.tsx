@@ -1,8 +1,9 @@
 import { CpuIcon } from "lucide-react";
-import { Bar, Chip, Panel } from "./Panel";
+import { Bar, Chip, Panel } from "./panel";
 import type { SbcState } from "../types/telemetry";
 
-function formatUptime(seconds: number): string {
+function formatUptime(ticks: number): string {
+  const seconds = ticks * 4;
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   return `${h}h ${String(m).padStart(2, "0")}m`;

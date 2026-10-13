@@ -1,16 +1,16 @@
 import { useState } from "react";
 import { GaugeIcon, PlugZapIcon, SlidersHorizontalIcon, WavesIcon, WifiIcon } from "lucide-react";
-import { AltitudeCard } from "./components/AltitudeCard";
-import { AttitudeIndicator } from "./components/AttitudeIndicator";
-import { BatteryBox } from "./components/BatteryBox";
-import { ChartPanel } from "./components/ChartPanel";
-import { FlightStatusCard } from "./components/FlightStatusCard";
-import { LinkCard } from "./components/LinkCard";
-import { NavSignalBox } from "./components/NavSignalBox";
-import { SbcStatusCard } from "./components/SbcStatusCard";
-import { TopBar } from "./components/TopBar";
+import { AltitudeCard } from "./components/altitude_card";
+import { AttitudeIndicator } from "./components/attitude_indicator";
+import { BatteryBox } from "./components/battery_box";
+import { ChartPanel } from "./components/chart_panel";
+import { FlightStatusCard } from "./components/flight_status_card";
+import { LinkCard } from "./components/link_card";
+import { NavSignalBox } from "./components/nav_signal_box";
+import { SbcStatusCard } from "./components/sbc_status_card";
+import { TopBar } from "./components/top_bar";
 import { gyroSeries, motorSeries, pidSeries, vehicle } from "./data/telemetry";
-import { useTelemetry } from "./hooks/useTelemetry";
+import { useTelemetry } from "./hooks/use_telemetry";
 import type { Telemetry } from "./types/telemetry";
 
 function activeWarning(t: Telemetry): string | null {
@@ -77,12 +77,12 @@ function ConnectionPanel({
         }}
       >
         <div className="mb-4 flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-teal-400/30 bg-teal-400/10 text-teal-300">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-teal-400/30 bg-teal-400/10 text-white">
             <WifiIcon size={18} />
           </span>
           <div className="min-w-0">
             <h1 className="text-sm font-semibold uppercase tracking-[0.08em] text-hud-text">Connect ESP32 Telemetry</h1>
-            <p className="mt-1 text-xs leading-5 text-hud-dim">Enter the IP shown on the ESP32 OLED.</p>
+            <p className="mt-1 text-xs leading-5 text-hud-muted">Enter the IP shown on the ESP32 OLED.</p>
           </div>
         </div>
 
@@ -100,7 +100,7 @@ function ConnectionPanel({
           />
           <button
             type="submit"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded border border-teal-300/40 bg-teal-300/15 px-4 font-mono text-2xs font-semibold uppercase tracking-[0.12em] text-teal-200 transition hover:border-teal-200 hover:bg-teal-300/20 focus:outline-none focus:ring-2 focus:ring-teal-300/30"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded border border-teal-300/40 bg-teal-300/15 px-4 font-mono text-2xs font-semibold uppercase tracking-[0.12em] text-white transition hover:border-teal-200 hover:bg-teal-300/20 focus:outline-none focus:ring-2 focus:ring-teal-300/30"
           >
             <PlugZapIcon size={14} />
             Connect
@@ -109,7 +109,7 @@ function ConnectionPanel({
 
         {error ? <p className="mt-3 font-mono text-2xs uppercase tracking-[0.08em] text-sig-red">{error}</p> : null}
 
-        <div className="mt-4 rounded border border-hud-line bg-hud-bg/70 p-3 font-mono text-2xs leading-5 text-hud-dim">
+        <div className="mt-4 rounded border border-hud-line bg-hud-bg/70 p-3 font-mono text-2xs leading-5 text-hud-muted">
           <div>Example: 10.160.142.17</div>
           <div>Dashboard will read: http://&lt;esp-ip&gt;/telemetry.json</div>
         </div>
@@ -146,7 +146,7 @@ export function App({ streaming = true }: { streaming?: boolean }) {
   }
 
   return (
-    <div className="hud-grid-bg flex min-h-full w-full flex-col bg-hud-bg font-sans">
+    <div className="hud-grid-bg flex min-h-full w-full flex-col bg-hud-bg font-sans xl:h-full xl:min-h-0">
       <TopBar
         live={live}
         onToggleLive={() => setLive((value) => !value)}
@@ -156,7 +156,7 @@ export function App({ streaming = true }: { streaming?: boolean }) {
         warning={activeWarning(t)}
       />
 
-      <main className="flex flex-1 flex-col gap-2 p-2.5">
+      <main className="flex flex-1 flex-col gap-2 p-2.5 xl:min-h-0">
         {t.source.status !== "online" ? (
           <div
             className={`flex items-center justify-between gap-3 rounded border px-3 py-2 font-mono text-2xs uppercase tracking-[0.08em] ${
@@ -170,20 +170,20 @@ export function App({ streaming = true }: { streaming?: boolean }) {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-12">
-          <BatteryBox battery={t.battery} className="min-h-[150px] xl:col-span-3 xl:h-[164px]" />
-          <NavSignalBox nav={t.nav} className="min-h-[150px] xl:col-span-4 xl:h-[164px]" />
-          <AltitudeCard altitude={t.altitude} className="min-h-[150px] xl:col-span-2 xl:h-[164px]" />
-          <LinkCard link={t.link} className="min-h-[150px] xl:col-span-3 xl:h-[164px]" />
+        <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(400px,460px)_minmax(0,1fr)]">
+          <AttitudeIndicator attitude={t.attitude} className="h-[360px] xl:h-auto" />
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 xl:grid-rows-2">
+            <BatteryBox battery={t.battery} className="min-h-[156px] xl:min-h-0" />
+            <NavSignalBox nav={t.nav} className="min-h-[156px] xl:min-h-0" />
+            <AltitudeCard altitude={t.altitude} className="min-h-[156px] xl:min-h-0" />
+            <LinkCard link={t.link} className="min-h-[156px] xl:min-h-0" />
+            <FlightStatusCard flight={t.flight} className="min-h-[180px] xl:min-h-0" />
+            <SbcStatusCard sbc={t.sbc} className="min-h-[180px] xl:min-h-0" />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 xl:grid-cols-12">
-          <FlightStatusCard flight={t.flight} className="min-h-[178px] xl:col-span-4 xl:h-[178px]" />
-          <SbcStatusCard sbc={t.sbc} className="min-h-[178px] xl:col-span-5 xl:h-[178px]" />
-          <AttitudeIndicator attitude={t.attitude} className="min-h-[150px] lg:col-span-2 xl:col-span-3 xl:h-[178px]" />
-        </div>
-
-        <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 xl:min-h-[300px] xl:flex-1 xl:grid-rows-3">
           <ChartPanel
             label="PID Response"
             icon={<SlidersHorizontalIcon size={12} />}
@@ -192,11 +192,11 @@ export function App({ streaming = true }: { streaming?: boolean }) {
             domain={[-10, 10]}
             ticks={[-10, -5, 0, 5, 10]}
             unit="°"
-            className="h-[196px]"
+            className="h-[220px] xl:h-auto xl:min-h-0"
             footer={
               <>
-                <span>err · deg · 64 s window</span>
-                <span>rate 1 hz</span>
+                <span>err · deg · 60 s window</span>
+                <span>rate 50 hz</span>
               </>
             }
           />
@@ -205,10 +205,10 @@ export function App({ streaming = true }: { streaming?: boolean }) {
             icon={<GaugeIcon size={12} />}
             series={motorSeries}
             data={t.motors as unknown as Array<Record<string, number>>}
-            domain={[40, 80]}
-            ticks={[40, 50, 60, 70, 80]}
+            domain={[0, 100]}
+            ticks={[0, 20, 40, 60, 80, 100]}
             unit="%"
-            className="h-[196px]"
+            className="h-[220px] xl:h-auto xl:min-h-0"
             footer={
               <>
                 <span>throttle out · quad-x</span>
@@ -226,24 +226,23 @@ export function App({ streaming = true }: { streaming?: boolean }) {
               </>
             }
           />
+          <ChartPanel
+            label="Gyroscope · 3-Axis"
+            icon={<WavesIcon size={12} />}
+            series={gyroSeries}
+            data={t.gyro as unknown as Array<Record<string, number>>}
+            domain={[-40, 40]}
+            ticks={[-40, -20, 0, 20, 40]}
+            unit=""
+            className="h-[220px] xl:h-auto xl:min-h-0"
+            footer={
+              <>
+                <span>deg/s · imu1 · filtered</span>
+                <span>{vehicle.firmware}</span>
+              </>
+            }
+          />
         </div>
-
-        <ChartPanel
-          label="Gyroscope · 3-Axis"
-          icon={<WavesIcon size={12} />}
-          series={gyroSeries}
-          data={t.gyro as unknown as Array<Record<string, number>>}
-          domain={[-40, 40]}
-          ticks={[-40, -20, 0, 20, 40]}
-          unit=""
-          className="h-[170px]"
-          footer={
-            <>
-              <span>deg/s · imu1 · filtered</span>
-              <span>{vehicle.firmware}</span>
-            </>
-          }
-        />
 
         <footer className="flex items-center justify-between px-1 pb-1 font-mono text-2xs text-hud-faint">
           <span className="flex items-center gap-1.5">
@@ -252,7 +251,7 @@ export function App({ streaming = true }: { streaming?: boolean }) {
           </span>
           <button
             type="button"
-            className="hidden rounded border border-hud-line px-2 py-1 uppercase tracking-[0.12em] text-hud-dim transition hover:border-teal-300/50 hover:text-teal-200 sm:block"
+            className="hidden rounded border border-hud-line px-2 py-1 uppercase tracking-[0.12em] text-hud-muted transition hover:border-teal-300/50 hover:text-white sm:block"
             onClick={() => {
               setLive(false);
               setEndpoint("");

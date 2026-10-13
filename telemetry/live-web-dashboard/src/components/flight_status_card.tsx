@@ -1,9 +1,8 @@
 import { PlaneIcon } from "lucide-react";
-import { Chip, Panel } from "./Panel";
+import { Chip, Panel } from "./panel";
 import type { FlightState } from "../types/telemetry";
-import type { ReactNode } from "react";
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2 border-b border-hud-line/70 py-[6px] last:border-0">
       <span className="text-2xs uppercase tracking-[0.1em] text-hud-faint">{label}</span>

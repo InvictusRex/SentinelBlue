@@ -50,12 +50,12 @@ type ChipProps = {
 };
 
 const chipTones: Record<string, string> = {
-  neutral: "border-hud-edge bg-hud-raise text-hud-dim",
-  green: "border-sig-green/40 bg-sig-green/10 text-sig-green",
-  amber: "border-sig-amber/40 bg-sig-amber/10 text-sig-amber",
-  red: "border-sig-red/40 bg-sig-red/10 text-sig-red",
-  cyan: "border-sig-cyan/40 bg-sig-cyan/10 text-sig-cyan",
-  blue: "border-sig-blue/40 bg-sig-blue/10 text-sig-blue"
+  neutral: "border-hud-edge bg-hud-raise text-white",
+  green: "border-sig-green/40 bg-sig-green/10 text-white",
+  amber: "border-sig-amber/40 bg-sig-amber/10 text-white",
+  red: "border-sig-red/40 bg-sig-red/10 text-white",
+  cyan: "border-sig-cyan/40 bg-sig-cyan/10 text-white",
+  blue: "border-sig-blue/40 bg-sig-blue/10 text-white"
 };
 
 export function Chip({ children, tone = "neutral", className = "" }: ChipProps) {

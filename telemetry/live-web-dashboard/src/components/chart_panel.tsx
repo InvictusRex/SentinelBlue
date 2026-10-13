@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { ChartLegend, TelemetryChart } from "./TelemetryChart";
-import { Panel } from "./Panel";
+import { ChartLegend, TelemetryChart } from "./telemetry_chart";
+import { Panel } from "./panel";
 import type { SeriesDef } from "../types/telemetry";
 
 type ChartPanelProps = {

@@ -1,6 +1,6 @@
 import { ActivityIcon, PauseIcon, PlayIcon, ShieldAlertIcon } from "lucide-react";
 import { vehicle } from "../data/telemetry";
-import { Chip } from "./Panel";
+import { Chip } from "./panel";
 
 type TopBarProps = {
   live: boolean;
@@ -12,7 +12,7 @@ type TopBarProps = {
 };
 
 function stamp(clock: number): string {
-  const total = clock;
+  const total = clock * 4;
   const h = String(Math.floor(total / 3600) % 24).padStart(2, "0");
   const m = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
   const s = String(total % 60).padStart(2, "0");
@@ -50,7 +50,7 @@ export function TopBar({ live, onToggleLive, armed, mode, clock, warning }: TopB
         <button
           type="button"
           onClick={onToggleLive}
-          className="flex items-center gap-1.5 rounded border border-hud-edge bg-hud-raise px-2 py-1 font-mono text-2xs font-semibold uppercase tracking-[0.1em] text-hud-dim transition-colors duration-150 ease-out hover:border-sig-cyan/50 hover:text-sig-cyan focus:outline-none focus-visible:ring-1 focus-visible:ring-sig-cyan"
+          className="flex items-center gap-1.5 rounded border border-hud-edge bg-hud-raise px-2 py-1 font-mono text-2xs font-semibold uppercase tracking-[0.1em] text-hud-dim transition-colors duration-150 ease-out hover:border-sig-cyan/50 hover:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-sig-cyan"
           aria-pressed={live}
         >
           {live ? <PauseIcon size={11} /> : <PlayIcon size={11} />}

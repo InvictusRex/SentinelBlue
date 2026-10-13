@@ -1,5 +1,5 @@
 import { MountainSnowIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
-import { Chip, Panel } from "./Panel";
+import { Chip, Panel } from "./panel";
 import type { AltitudeState } from "../types/telemetry";
 
 export function AltitudeCard({ altitude, className }: { altitude: AltitudeState; className?: string }) {

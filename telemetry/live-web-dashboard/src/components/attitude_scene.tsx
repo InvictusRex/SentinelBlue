@@ -3,7 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import { CanvasTexture, Euler, Quaternion, Shape, Vector3 } from "three";
 import type { AttitudeState } from "../types/telemetry";
 
-function AxisLabel({ text, position, color }: { text: string; position: [number, number, number]; color: string }) {
+function AxisLabel({ text, position }: { text: string; position: [number, number, number] }) {
   const texture = useMemo(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 128;
@@ -12,10 +12,10 @@ function AxisLabel({ text, position, color }: { text: string; position: [number,
     context.font = "500 38px monospace";
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillStyle = color;
+    context.fillStyle = "#ffffff";
     context.fillText(text, 64, 32);
     return new CanvasTexture(canvas);
-  }, [text, color]);
+  }, [text]);
   useEffect(() => () => texture.dispose(), [texture]);
   return (
     <sprite position={position} scale={[0.8, 0.4, 1]}>
@@ -55,7 +55,7 @@ function Arrow({ roll, pitch, yaw }: AttitudeState) {
 
 export function AttitudeScene({ attitude }: { attitude: AttitudeState }) {
   return (
-    <div className="h-[128px] min-w-0 flex-1" role="img" aria-label={`3D attitude, X/Y/Z axes. Roll ${attitude.roll.toFixed(1)}, pitch ${attitude.pitch.toFixed(1)}, yaw ${attitude.yaw.toFixed(1)} degrees.`}>
+    <div className="min-h-[220px] w-full min-w-0 flex-1 xl:min-h-0" role="img" aria-label={`3D attitude, X/Y/Z axes. Roll ${attitude.roll.toFixed(1)}, pitch ${attitude.pitch.toFixed(1)}, yaw ${attitude.yaw.toFixed(1)} degrees.`}>
       <Canvas
         frameloop="demand"
         dpr={[1, 2]}
@@ -69,9 +69,9 @@ export function AttitudeScene({ attitude }: { attitude: AttitudeState }) {
         <arrowHelper args={[new Vector3(1, 0, 0), new Vector3(-1.4, 0, -0.85), 2.95, "#ff757e", 0.14, 0.07]} />
         <arrowHelper args={[new Vector3(0, 1, 0), new Vector3(0, -1.4, -0.85), 2.95, "#2dd4bf", 0.14, 0.07]} />
         <arrowHelper args={[new Vector3(0, 0, 1), new Vector3(0, 0, -0.85), 2.25, "#78aaff", 0.14, 0.07]} />
-        <AxisLabel text="X" position={[1.8, 0, -0.85]} color="#ff757e" />
-        <AxisLabel text="Y" position={[0, 1.8, -0.85]} color="#2dd4bf" />
-        <AxisLabel text="Z" position={[0, 0, 1.65]} color="#78aaff" />
+        <AxisLabel text="X" position={[1.8, 0, -0.85]} />
+        <AxisLabel text="Y" position={[0, 1.8, -0.85]} />
+        <AxisLabel text="Z" position={[0, 0, 1.65]} />
         <Arrow {...attitude} />
       </Canvas>
     </div>
