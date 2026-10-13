@@ -170,20 +170,19 @@ export function App({ streaming = true }: { streaming?: boolean }) {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(400px,460px)_minmax(0,1fr)]">
-          <AttitudeIndicator attitude={t.attitude} className="h-[360px] xl:h-auto" />
+        <div className="grid flex-1 grid-cols-1 gap-2 xl:min-h-[900px] xl:grid-rows-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
+          <div className="grid grid-cols-1 gap-2 xl:min-h-0 xl:grid-cols-[minmax(400px,460px)_minmax(0,1fr)]">
+            <AttitudeIndicator attitude={t.attitude} className="h-[360px] xl:h-full xl:min-h-0" />
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 xl:grid-rows-2">
-            <BatteryBox battery={t.battery} className="min-h-[156px] xl:min-h-0" />
-            <NavSignalBox nav={t.nav} className="min-h-[156px] xl:min-h-0" />
-            <AltitudeCard altitude={t.altitude} className="min-h-[156px] xl:min-h-0" />
-            <LinkCard link={t.link} className="min-h-[156px] xl:min-h-0" />
-            <FlightStatusCard flight={t.flight} className="min-h-[180px] xl:min-h-0" />
-            <SbcStatusCard sbc={t.sbc} className="min-h-[180px] xl:min-h-0" />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:h-full xl:min-h-0 xl:grid-cols-3 xl:grid-rows-2">
+              <BatteryBox battery={t.battery} className="min-h-[156px] xl:h-full xl:min-h-0" />
+              <NavSignalBox nav={t.nav} className="min-h-[156px] xl:h-full xl:min-h-0" />
+              <AltitudeCard altitude={t.altitude} className="min-h-[156px] xl:h-full xl:min-h-0" />
+              <LinkCard link={t.link} className="min-h-[156px] xl:h-full xl:min-h-0" />
+              <FlightStatusCard flight={t.flight} className="min-h-[180px] xl:h-full xl:min-h-0" />
+              <SbcStatusCard sbc={t.sbc} className="min-h-[180px] xl:h-full xl:min-h-0" />
+            </div>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-2 xl:min-h-[300px] xl:flex-1 xl:grid-rows-3">
           <ChartPanel
             label="PID Response"
             icon={<SlidersHorizontalIcon size={12} />}
@@ -192,7 +191,7 @@ export function App({ streaming = true }: { streaming?: boolean }) {
             domain={[-10, 10]}
             ticks={[-10, -5, 0, 5, 10]}
             unit="°"
-            className="h-[220px] xl:h-auto xl:min-h-0"
+            className="h-[220px] xl:h-full xl:min-h-0"
             footer={
               <>
                 <span>err · deg · 60 s window</span>
@@ -208,7 +207,7 @@ export function App({ streaming = true }: { streaming?: boolean }) {
             domain={[0, 100]}
             ticks={[0, 20, 40, 60, 80, 100]}
             unit="%"
-            className="h-[220px] xl:h-auto xl:min-h-0"
+            className="h-[220px] xl:h-full xl:min-h-0"
             footer={
               <>
                 <span>throttle out · quad-x</span>
@@ -234,7 +233,7 @@ export function App({ streaming = true }: { streaming?: boolean }) {
             domain={[-40, 40]}
             ticks={[-40, -20, 0, 20, 40]}
             unit=""
-            className="h-[220px] xl:h-auto xl:min-h-0"
+            className="h-[220px] xl:h-full xl:min-h-0"
             footer={
               <>
                 <span>deg/s · imu1 · filtered</span>
