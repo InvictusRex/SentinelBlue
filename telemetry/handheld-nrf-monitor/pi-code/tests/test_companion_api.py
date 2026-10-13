@@ -41,7 +41,7 @@ class CompanionAPITests(unittest.TestCase):
     def setUp(self):
         self.payload = json.dumps({
             "center": {"latitude": 12.9716, "longitude": 77.5946},
-            "radius_km": 1,
+            "radius_km": 0.01,
             "altitude_m": 30,
         }).encode("utf-8")
 
@@ -68,7 +68,8 @@ class CompanionAPITests(unittest.TestCase):
             body = json.load(response)
 
         self.assertEqual("planned", body["status"])
-        self.assertEqual(4, body["plan"]["cell_count"])
+        self.assertEqual(1, body["plan"]["cell_count"])
+        self.assertGreater(body["plan"]["estimate"]["survey_line_count"], 0)
 
     def test_live_execution_is_locked(self):
         manager, port = self._start(simulate=False)
@@ -87,7 +88,10 @@ class CompanionAPITests(unittest.TestCase):
 
         self.assertEqual(202, response.status)
         self.assertEqual("simulation_started", body["status"])
-        self.assertEqual(["clear", ("upload", 8), ("arm", True), ("mode", "AUTO")], manager.calls)
+        self.assertEqual("clear", manager.calls[0])
+        self.assertEqual("upload", manager.calls[1][0])
+        self.assertGreater(manager.calls[1][1], 8)
+        self.assertEqual([("arm", True), ("mode", "AUTO")], manager.calls[2:])
 
 
 if __name__ == "__main__":

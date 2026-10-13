@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 from search_mission_planner import build_search_mission
+from terrain_provider import sample_plan_terrain
 
 
 MAX_REQUEST_BYTES = 64 * 1024
@@ -72,17 +73,31 @@ def _handler_for(mav_manager):
             try:
                 payload = self._read_json()
                 plan = _plan_from_payload(payload, mav_manager.get_telemetry_snapshot())
+                terrain = (
+                    sample_plan_terrain(plan, str(payload.get("surface_type", "water")))
+                    if payload.get("terrain_enabled", False)
+                    else {"status": "disabled", "used_for_clearance": False}
+                )
             except (ValueError, UnicodeError, json.JSONDecodeError) as exc:
                 self._send_json(400, {"error": str(exc)})
                 return
 
             if path == "/api/mission/plan":
-                self._send_json(200, {"status": "planned", "plan": plan.to_dict()})
+                plan_payload = plan.to_dict()
+                plan_payload["terrain"] = terrain
+                self._send_json(200, {"status": "planned", "plan": plan_payload})
                 return
 
             if not mav_manager.simulate:
                 self._send_json(403, {
                     "error": "live Pixhawk execution is locked; validate this mission in simulation first"
+                })
+                return
+
+            if not plan.estimate.simulation_ready:
+                self._send_json(422, {
+                    "error": "mission exceeds single-sortie limits",
+                    "reasons": list(plan.estimate.blocking_reasons),
                 })
                 return
 
@@ -99,7 +114,9 @@ def _handler_for(mav_manager):
                 if not mav_manager.set_arm(True) or not mav_manager.set_flight_mode("AUTO"):
                     self._send_json(500, {"error": "could not start the simulated mission"})
                     return
-                self._send_json(202, {"status": "simulation_started", "plan": plan.to_dict()})
+                plan_payload = plan.to_dict()
+                plan_payload["terrain"] = terrain
+                self._send_json(202, {"status": "simulation_started", "plan": plan_payload})
             finally:
                 mission_lock.release()
 
@@ -154,6 +171,11 @@ def _plan_from_payload(payload: Dict[str, Any], telemetry: Dict[str, Any]):
         altitude_m=payload.get("altitude_m"),
         home_latitude=home_latitude,
         home_longitude=home_longitude,
+        camera_horizontal_fov_deg=payload.get("camera_horizontal_fov_deg", 78.0),
+        camera_vertical_fov_deg=payload.get("camera_vertical_fov_deg", 60.0),
+        side_overlap_percent=payload.get("side_overlap_percent", 70.0),
+        forward_overlap_percent=payload.get("forward_overlap_percent", 75.0),
+        cruise_speed_m_s=payload.get("cruise_speed_m_s", 3.0),
     )
 
 

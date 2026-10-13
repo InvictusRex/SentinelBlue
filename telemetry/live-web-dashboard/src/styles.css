@@ -1,3 +1,4 @@
+@import "maplibre-gl/dist/maplibre-gl.css";
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
@@ -32,6 +33,27 @@ body {
     linear-gradient(to right, rgba(45, 212, 191, 0.04) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(45, 212, 191, 0.04) 1px, transparent 1px);
   background-size: 48px 48px;
+}
+
+.maplibregl-map {
+  font: inherit;
+  background: #070b10;
+}
+
+.maplibregl-ctrl-group {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  background: #10161f;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.maplibregl-ctrl-group button {
+  background-color: #10161f;
+}
+
+.maplibregl-ctrl-attrib {
+  color: #334155;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -770,7 +770,7 @@ class MAVLinkManager:
                         mission_state = f"CRUISE -> WP 1"
 
                 # 2. Speed Command (MAV_CMD_DO_CHANGE_SPEED = 178)
-                elif cmd == 178:
+                elif cmd in (178, 206):
                     self.sim_mission_index += 1
 
                 # 3. Waypoint Command (MAV_CMD_NAV_WAYPOINT = 16)

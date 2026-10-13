@@ -1,93 +1,100 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { CrosshairIcon, MapPinnedIcon, PlayIcon, RouteIcon, ShieldCheckIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { CameraIcon, CrosshairIcon, DownloadIcon, MapPinnedIcon, PlayIcon, RouteIcon, ShieldAlertIcon, ShieldCheckIcon } from "lucide-react";
+import { TerrainMissionMap } from "./terrain_mission_map";
 
 interface MissionCell {
-  cell_id: number;
-  row: number;
-  column: number;
-  center_latitude: number;
-  center_longitude: number;
+  cell_id: number; row: number; column: number;
+  north_m: number; east_m: number; south_m: number; west_m: number;
+  center_latitude: number; center_longitude: number;
 }
-
+interface SurveyLine {
+  cell_id: number; line_index: number;
+  start_latitude: number; start_longitude: number;
+  end_latitude: number; end_longitude: number; length_m: number;
+}
 interface MissionPlan {
   center: { latitude: number; longitude: number };
   home: { latitude: number; longitude: number };
-  radius_km: number;
-  altitude_m: number;
-  cell_count: number;
-  rows: number;
-  columns: number;
-  cells: MissionCell[];
-  route_cell_ids: number[];
-  phases: string[];
+  radius_km: number; altitude_m: number; cruise_speed_m_s: number;
+  cell_count: number; rows: number; columns: number;
+  cells: MissionCell[]; survey_lines: SurveyLine[]; phases: string[];
   mission_items: Array<Record<string, number>>;
+  camera: {
+    horizontal_fov_deg: number; vertical_fov_deg: number;
+    side_overlap_percent: number; forward_overlap_percent: number;
+    footprint_width_m: number; footprint_height_m: number;
+    line_spacing_m: number; trigger_distance_m: number;
+  };
+  estimate: {
+    survey_line_count: number; survey_distance_m: number; total_distance_m: number;
+    estimated_minutes: number; estimated_photos: number; mission_item_count: number;
+    recommended_sorties: number; simulation_ready: boolean;
+    blocking_reasons: string[]; warnings: string[];
+  };
+  terrain: {
+    status: string; provider?: string; sample_count?: number;
+    minimum_elevation_m?: number; maximum_elevation_m?: number;
+    elevation_range_m?: number; message?: string;
+    used_for_clearance: boolean; clearance_source?: string;
+  };
 }
-
-interface MissionResponse {
-  status: string;
-  plan: MissionPlan;
-}
+interface MissionResponse { status: string; plan: MissionPlan }
+interface ApiError { error?: string; reasons?: string[] }
 
 const API_STORAGE_KEY = "droneCompanionApi";
-const VIEW_WIDTH = 720;
-const VIEW_HEIGHT = 420;
+const inputClass = "mt-1 h-9 w-full rounded border border-hud-line bg-hud-bg px-2 font-mono text-sm text-hud-text outline-none focus:border-teal-300";
 
 function isPosition(latitude: number, longitude: number): boolean {
   return Number.isFinite(latitude) && Number.isFinite(longitude) &&
     latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180 &&
     !(latitude === 0 && longitude === 0);
 }
-
 function normalizeApi(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) throw new Error("Enter the Raspberry Pi companion API address.");
-  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
-  const url = new URL(withProtocol);
+  const url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`);
   if (!/^https?:$/.test(url.protocol)) throw new Error("Use an HTTP or HTTPS companion API address.");
   return url.origin;
 }
-
-function factors(value: number): [number, number] {
-  let rows = Math.floor(Math.sqrt(value));
-  while (rows > 1 && value % rows !== 0) rows -= 1;
-  return [rows, value / rows];
+function compactDistance(metres: number): string {
+  return metres >= 1000 ? `${(metres / 1000).toFixed(1)} km` : `${metres.toFixed(1)} m`;
+}
+function Metric({ label, value }: { label: string; value: string | number }) {
+  return <div className="rounded border border-hud-line bg-hud-bg px-2 py-2"><div className="font-mono text-sm text-white">{value}</div><div className="mt-0.5 text-2xs uppercase tracking-wide text-hud-faint">{label}</div></div>;
+}
+function missionPlannerFile(items: Array<Record<string, number>>): string {
+  const rows = items.map((item) => {
+    const coordinateFrame = item.frame === 6 ? 3 : item.frame;
+    const latitude = item.frame === 6 ? item.x / 1e7 : item.x;
+    const longitude = item.frame === 6 ? item.y / 1e7 : item.y;
+    return [
+      item.seq, item.current, coordinateFrame, item.command,
+      item.param1, item.param2, item.param3, item.param4,
+      latitude.toFixed(7), longitude.toFixed(7), item.z, item.autocontinue
+    ].join("\t");
+  });
+  return `QGC WPL 110\n${rows.join("\n")}\n`;
 }
 
-function routeIds(rows: number, columns: number): number[] {
-  return Array.from({ length: rows }, (_, row) => {
-    const ids = Array.from({ length: columns }, (_, column) => row * columns + column + 1);
-    return row % 2 === 0 ? ids : ids.reverse();
-  }).flat();
-}
-
-function coordinateOffset(
-  originLatitude: number,
-  originLongitude: number,
-  northMetres: number,
-  eastMetres: number
-): [number, number] {
-  const latitude = originLatitude + northMetres / 111_320;
-  const longitudeScale = 111_320 * Math.max(0.01, Math.cos(originLatitude * Math.PI / 180));
-  return [latitude, originLongitude + eastMetres / longitudeScale];
-}
-
-export function MissionPlanner({
-  currentLatitude,
-  currentLongitude,
-  telemetryAvailable
-}: {
-  currentLatitude: number;
-  currentLongitude: number;
-  telemetryAvailable: boolean;
+export function MissionPlanner({ currentLatitude, currentLongitude, telemetryAvailable }: {
+  currentLatitude: number; currentLongitude: number; telemetryAvailable: boolean;
 }) {
   const [apiInput, setApiInput] = useState(() => window.localStorage.getItem(API_STORAGE_KEY) ?? "localhost:8765");
   const [centerLatitude, setCenterLatitude] = useState("");
   const [centerLongitude, setCenterLongitude] = useState("");
-  const [radiusKm, setRadiusKm] = useState(1);
-  const [altitudeM, setAltitudeM] = useState(30);
+  const [radiusKm, setRadiusKm] = useState(0.025);
+  const [altitudeM, setAltitudeM] = useState(5);
+  const [horizontalFov, setHorizontalFov] = useState(78);
+  const [verticalFov, setVerticalFov] = useState(60);
+  const [sideOverlap, setSideOverlap] = useState(70);
+  const [forwardOverlap, setForwardOverlap] = useState(75);
+  const [cruiseSpeed, setCruiseSpeed] = useState(3);
+  const [surfaceType, setSurfaceType] = useState("water");
+  const [terrainEnabled, setTerrainEnabled] = useState(true);
+  const [rangefinderConfirmed, setRangefinderConfirmed] = useState(false);
   const [plan, setPlan] = useState<MissionPlan | null>(null);
   const [requestState, setRequestState] = useState<"idle" | "planning" | "ready" | "starting" | "running" | "error">("idle");
-  const [message, setMessage] = useState("Select a point on the plot or enter coordinates.");
+  const [message, setMessage] = useState("Select a point on the terrain map or enter coordinates.");
   const initializedFromTelemetry = useRef(false);
 
   const currentPositionValid = telemetryAvailable && isPosition(currentLatitude, currentLongitude);
@@ -102,64 +109,18 @@ export function MissionPlanner({
   const selectedLatitude = Number(centerLatitude);
   const selectedLongitude = Number(centerLongitude);
   const selectedPositionValid = isPosition(selectedLatitude, selectedLongitude);
-  const estimatedCellCount = Math.max(1, Math.ceil(radiusKm * 4));
-  const [estimatedRows, estimatedColumns] = useMemo(() => factors(estimatedCellCount), [estimatedCellCount]);
-  const displayedRows = plan?.rows ?? estimatedRows;
-  const displayedColumns = plan?.columns ?? estimatedColumns;
-  const displayedRoute = plan?.route_cell_ids ?? routeIds(displayedRows, displayedColumns);
-
-  const plotOrigin = useMemo(() => currentPositionValid
-    ? { latitude: currentLatitude, longitude: currentLongitude }
-    : selectedPositionValid
-      ? { latitude: selectedLatitude, longitude: selectedLongitude }
-      : null,
-  [currentLatitude, currentLongitude, currentPositionValid, selectedLatitude, selectedLongitude, selectedPositionValid]);
-  const extentMetres = Math.max(1_000, radiusKm * 1_600);
-
-  const selectedPlotPoint = useMemo(() => {
-    if (!plotOrigin || !selectedPositionValid) return null;
-    const north = (selectedLatitude - plotOrigin.latitude) * 111_320;
-    const east = (selectedLongitude - plotOrigin.longitude) * 111_320 *
-      Math.max(0.01, Math.cos(plotOrigin.latitude * Math.PI / 180));
-    return {
-      x: VIEW_WIDTH / 2 + (east / extentMetres) * (VIEW_WIDTH / 2),
-      y: VIEW_HEIGHT / 2 - (north / extentMetres) * (VIEW_HEIGHT / 2)
-    };
-  }, [extentMetres, plotOrigin, selectedLatitude, selectedLongitude, selectedPositionValid]);
-
-  const searchBox = {
-    width: (radiusKm * 1_000 / extentMetres) * VIEW_WIDTH,
-    height: (radiusKm * 1_000 / extentMetres) * VIEW_HEIGHT
-  };
-
-  const selectPoint = (event: React.MouseEvent<SVGSVGElement>) => {
-    if (!plotOrigin) {
-      setRequestState("error");
-      setMessage("Enter valid coordinates before selecting a point on the plot.");
-      return;
-    }
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const x = ((event.clientX - bounds.left) / bounds.width) * VIEW_WIDTH;
-    const y = ((event.clientY - bounds.top) / bounds.height) * VIEW_HEIGHT;
-    const east = ((x - VIEW_WIDTH / 2) / (VIEW_WIDTH / 2)) * extentMetres;
-    const north = ((VIEW_HEIGHT / 2 - y) / (VIEW_HEIGHT / 2)) * extentMetres;
-    const [latitude, longitude] = coordinateOffset(plotOrigin.latitude, plotOrigin.longitude, north, east);
-    setCenterLatitude(latitude.toFixed(7));
-    setCenterLongitude(longitude.toFixed(7));
-    setPlan(null);
-    setRequestState("idle");
-    setMessage("Search centre selected. Generate the route to review every cell.");
-  };
+  const needsRangefinder = altitudeM <= 15;
+  const clearPlan = () => { setPlan(null); setRequestState("idle"); };
 
   const requestPlan = async (path: "/api/mission/plan" | "/api/mission/simulate") => {
     if (!selectedPositionValid) {
       setRequestState("error");
-      setMessage("Enter a valid latitude and longitude.");
+      setMessage("Enter a valid latitude and longitude or click the map.");
       return;
     }
     const starting = path.endsWith("simulate");
     setRequestState(starting ? "starting" : "planning");
-    setMessage(starting ? "Loading the mission into the simulator…" : "Generating the grid route on the Raspberry Pi…");
+    setMessage(starting ? "Loading the checked mission into the simulator..." : "Calculating camera coverage and terrain context...");
     try {
       const api = normalizeApi(apiInput);
       window.localStorage.setItem(API_STORAGE_KEY, apiInput.trim());
@@ -168,172 +129,130 @@ export function MissionPlanner({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           center: { latitude: selectedLatitude, longitude: selectedLongitude },
-          radius_km: radiusKm,
-          altitude_m: altitudeM
+          radius_km: radiusKm, altitude_m: altitudeM,
+          camera_horizontal_fov_deg: horizontalFov, camera_vertical_fov_deg: verticalFov,
+          side_overlap_percent: sideOverlap, forward_overlap_percent: forwardOverlap,
+          cruise_speed_m_s: cruiseSpeed, surface_type: surfaceType,
+          terrain_enabled: terrainEnabled
         })
       });
-      const body = await response.json() as MissionResponse | { error?: string };
+      const body = await response.json() as MissionResponse | ApiError;
       if (!response.ok || !("plan" in body)) {
-        throw new Error("error" in body && body.error ? body.error : `Companion API returned ${response.status}`);
+        const details = "reasons" in body && body.reasons?.length ? ` ${body.reasons.join(" ")}` : "";
+        throw new Error(`${"error" in body && body.error ? body.error : `Companion API returned ${response.status}`}${details}`);
       }
       setPlan(body.plan);
       setRequestState(starting ? "running" : "ready");
       setMessage(starting
-        ? "Simulation started. Follow mission progress in the telemetry view."
-        : `${body.plan.cell_count} cells planned. Review the route before starting the simulator.`);
+        ? "Simulation started. Follow progress in the telemetry view."
+        : body.plan.estimate.simulation_ready
+          ? "Coverage plan generated. Confirm the rangefinder check before simulation."
+          : `Plan generated, but it must be split into about ${body.plan.estimate.recommended_sorties} sorties.`);
     } catch (error) {
       setRequestState("error");
       setMessage(error instanceof Error ? error.message : "The Raspberry Pi companion API could not be reached.");
     }
   };
 
-  const boxLeft = (selectedPlotPoint?.x ?? VIEW_WIDTH / 2) - searchBox.width / 2;
-  const boxTop = (selectedPlotPoint?.y ?? VIEW_HEIGHT / 2) - searchBox.height / 2;
-  const cellWidth = searchBox.width / displayedColumns;
-  const cellHeight = searchBox.height / displayedRows;
-  const routePoints = displayedRoute.map((cellId) => {
-    const index = cellId - 1;
-    const row = Math.floor(index / displayedColumns);
-    const column = index % displayedColumns;
-    return `${boxLeft + column * cellWidth + cellWidth / 2},${boxTop + row * cellHeight + cellHeight / 2}`;
-  }).join(" ");
+  const simulatorBlocked = !plan?.estimate.simulation_ready || (needsRangefinder && !rangefinderConfirmed);
+  const terrainSummary = plan?.terrain.status === "available"
+    ? `${plan.terrain.sample_count} DEM samples · ${plan.terrain.minimum_elevation_m}-${plan.terrain.maximum_elevation_m} m AMSL`
+    : plan?.terrain.message ?? (plan?.terrain.status === "disabled" ? "Terrain sampling disabled" : "Terrain data unavailable");
+  const downloadMission = () => {
+    if (!plan?.mission_items.length) return;
+    const blob = new Blob([missionPlannerFile(plan.mission_items)], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "sentinelblue_camera_survey.waypoints";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
 
   return (
     <main className="flex flex-1 flex-col gap-3 overflow-auto p-3 text-hud-text xl:min-h-0 xl:overflow-hidden">
       <div className="flex flex-col justify-between gap-3 border-b border-hud-line pb-3 lg:flex-row lg:items-end">
         <div>
-          <h1 className="text-lg font-semibold tracking-[-0.02em]">Companion search planner</h1>
-          <p className="mt-1 max-w-[72ch] text-sm leading-5 text-hud-muted">
-            Choose the search centre, set radius and altitude, then inspect the complete takeoff, grid search, return and landing route.
-          </p>
+          <h1 className="text-lg font-semibold tracking-[-0.02em]">Camera coverage mission planner</h1>
+          <p className="mt-1 max-w-[76ch] text-sm leading-5 text-hud-muted">Plan a complete lawnmower survey from the camera footprint, overlap and flight altitude. Every cell receives parallel coverage lines.</p>
         </div>
-        <div className="flex items-center gap-2 rounded border border-sig-amber/40 bg-sig-amber/10 px-3 py-2 text-xs text-sig-amber">
-          <ShieldCheckIcon size={16} />
-          Simulation execution only · live Pixhawk control locked
-        </div>
+        <div className="flex items-center gap-2 rounded border border-sig-amber/40 bg-sig-amber/10 px-3 py-2 text-xs text-sig-amber"><ShieldCheckIcon size={16} />Simulation only · live Pixhawk control locked</div>
       </div>
 
-      <div className="grid flex-1 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <section className="flex min-h-[480px] flex-col overflow-hidden rounded border border-hud-line bg-hud-panel xl:min-h-0">
+      <div className="grid flex-1 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="flex min-h-[500px] flex-col overflow-hidden rounded border border-hud-line bg-hud-panel xl:min-h-0">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line px-3 py-2">
-            <span className="flex items-center gap-2 text-sm font-semibold"><MapPinnedIcon size={16} /> Search area</span>
-            <span className="font-mono text-xs text-hud-muted">click plot to place centre · N ↑</span>
+            <span className="flex items-center gap-2 text-sm font-semibold"><MapPinnedIcon size={16} /> Terrain and coverage</span>
+            <span className="font-mono text-xs text-hud-muted">click map to place search centre</span>
           </div>
-          <svg
-            className="min-h-[420px] flex-1 cursor-crosshair bg-[#070b10] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-300/50"
-            viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
-            role="application"
-            aria-label="Mission coordinate plot. Click to select the search centre."
-            tabIndex={0}
-            onClick={selectPoint}
-          >
-            <defs>
-              <pattern id="mission-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(94,234,212,0.10)" strokeWidth="1" />
-              </pattern>
-            </defs>
-            <rect width={VIEW_WIDTH} height={VIEW_HEIGHT} fill="url(#mission-grid)" />
-            <line x1={VIEW_WIDTH / 2} y1="0" x2={VIEW_WIDTH / 2} y2={VIEW_HEIGHT} stroke="rgba(255,255,255,0.09)" />
-            <line x1="0" y1={VIEW_HEIGHT / 2} x2={VIEW_WIDTH} y2={VIEW_HEIGHT / 2} stroke="rgba(255,255,255,0.09)" />
-
-            {selectedPlotPoint ? (
-              <g>
-                <rect
-                  x={boxLeft}
-                  y={boxTop}
-                  width={searchBox.width}
-                  height={searchBox.height}
-                  fill="rgba(45,212,191,0.08)"
-                  stroke="#5eead4"
-                  strokeWidth="2"
-                />
-                {Array.from({ length: displayedColumns - 1 }, (_, index) => (
-                  <line key={`column-${index}`} x1={boxLeft + (index + 1) * cellWidth} y1={boxTop} x2={boxLeft + (index + 1) * cellWidth} y2={boxTop + searchBox.height} stroke="rgba(94,234,212,0.45)" />
-                ))}
-                {Array.from({ length: displayedRows - 1 }, (_, index) => (
-                  <line key={`row-${index}`} x1={boxLeft} y1={boxTop + (index + 1) * cellHeight} x2={boxLeft + searchBox.width} y2={boxTop + (index + 1) * cellHeight} stroke="rgba(94,234,212,0.45)" />
-                ))}
-                <polyline points={routePoints} fill="none" stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                {displayedRoute.map((cellId) => {
-                  const index = cellId - 1;
-                  const row = Math.floor(index / displayedColumns);
-                  const column = index % displayedColumns;
-                  return <circle key={cellId} cx={boxLeft + column * cellWidth + cellWidth / 2} cy={boxTop + row * cellHeight + cellHeight / 2} r="4" fill="#fbbf24" />;
-                })}
-                <circle cx={selectedPlotPoint.x} cy={selectedPlotPoint.y} r="8" fill="#5eead4" stroke="#071014" strokeWidth="3" />
-              </g>
-            ) : null}
-
-            {currentPositionValid ? (
-              <g transform={`translate(${VIEW_WIDTH / 2} ${VIEW_HEIGHT / 2})`}>
-                <circle r="11" fill="#60a5fa" stroke="#071014" strokeWidth="3" />
-                <path d="M 0 -18 L 5 -9 L -5 -9 Z" fill="#60a5fa" />
-                <text x="16" y="5" fill="#bfdbfe" fontSize="12" fontFamily="monospace">DRONE / HOME</text>
-              </g>
-            ) : null}
-          </svg>
+          <TerrainMissionMap
+            selected={selectedPositionValid ? { latitude: selectedLatitude, longitude: selectedLongitude } : null}
+            plan={plan}
+            onSelect={(latitude, longitude) => {
+              setCenterLatitude(latitude.toFixed(7));
+              setCenterLongitude(longitude.toFixed(7));
+              clearPlan();
+              setMessage("Search centre selected. Generate the plan to calculate coverage.");
+            }}
+          />
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hud-line px-3 py-2 font-mono text-xs text-hud-muted">
-            <span>{plotOrigin ? `${plotOrigin.latitude.toFixed(6)}, ${plotOrigin.longitude.toFixed(6)}` : "Waiting for a coordinate origin"}</span>
-            <span>plot span ±{(extentMetres / 1000).toFixed(1)} km</span>
+            <span>{selectedPositionValid ? `${selectedLatitude.toFixed(6)}, ${selectedLongitude.toFixed(6)}` : "No search centre selected"}</span>
+            <span>amber: flight lines · teal: cells · blue: home</span>
           </div>
         </section>
 
         <aside className="space-y-3 overflow-auto pr-0.5 xl:min-h-0">
-          <form
-            className="space-y-3 rounded border border-hud-line bg-hud-panel p-3"
-            onSubmit={(event) => { event.preventDefault(); void requestPlan("/api/mission/plan"); }}
-          >
+          <form className="space-y-3 rounded border border-hud-line bg-hud-panel p-3" onSubmit={(event) => { event.preventDefault(); void requestPlan("/api/mission/plan"); }}>
             <div className="flex items-center gap-2 text-sm font-semibold"><CrosshairIcon size={16} /> Mission inputs</div>
-            <label className="block text-xs text-hud-muted">
-              Raspberry Pi companion API
-              <input value={apiInput} onChange={(event) => setApiInput(event.target.value)} placeholder="192.168.1.50:8765" className="mt-1 h-9 w-full rounded border border-hud-line bg-hud-bg px-2 font-mono text-sm text-hud-text outline-none focus:border-teal-300 focus:ring-2 focus:ring-teal-300/20" />
-            </label>
+            <label className="block text-xs text-hud-muted">Raspberry Pi companion API<input value={apiInput} onChange={(event) => setApiInput(event.target.value)} placeholder="192.168.1.50:8765" className={inputClass} /></label>
             <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs text-hud-muted">Latitude
-                <input value={centerLatitude} onChange={(event) => { setCenterLatitude(event.target.value); setPlan(null); }} inputMode="decimal" className="mt-1 h-9 w-full rounded border border-hud-line bg-hud-bg px-2 font-mono text-sm text-hud-text outline-none focus:border-teal-300" />
-              </label>
-              <label className="text-xs text-hud-muted">Longitude
-                <input value={centerLongitude} onChange={(event) => { setCenterLongitude(event.target.value); setPlan(null); }} inputMode="decimal" className="mt-1 h-9 w-full rounded border border-hud-line bg-hud-bg px-2 font-mono text-sm text-hud-text outline-none focus:border-teal-300" />
-              </label>
+              <label className="text-xs text-hud-muted">Latitude<input value={centerLatitude} onChange={(event) => { setCenterLatitude(event.target.value); clearPlan(); }} inputMode="decimal" className={inputClass} /></label>
+              <label className="text-xs text-hud-muted">Longitude<input value={centerLongitude} onChange={(event) => { setCenterLongitude(event.target.value); clearPlan(); }} inputMode="decimal" className={inputClass} /></label>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs text-hud-muted">Search radius · km
-                <input type="number" min="0.25" max="10" step="0.25" value={radiusKm} onChange={(event) => { setRadiusKm(Number(event.target.value)); setPlan(null); }} className="mt-1 h-9 w-full rounded border border-hud-line bg-hud-bg px-2 font-mono text-sm text-hud-text outline-none focus:border-teal-300" />
-              </label>
-              <label className="text-xs text-hud-muted">Flight altitude · m
-                <input type="number" min="5" max="120" step="1" value={altitudeM} onChange={(event) => { setAltitudeM(Number(event.target.value)); setPlan(null); }} className="mt-1 h-9 w-full rounded border border-hud-line bg-hud-bg px-2 font-mono text-sm text-hud-text outline-none focus:border-teal-300" />
-              </label>
+            <div className="grid grid-cols-3 gap-2">
+              <label className="text-xs text-hud-muted">Radius · km<input type="number" min="0.01" max="10" step="0.005" value={radiusKm} onChange={(event) => { setRadiusKm(Number(event.target.value)); clearPlan(); }} className={inputClass} /></label>
+              <label className="text-xs text-hud-muted">Altitude · m<input type="number" min="5" max="120" step="1" value={altitudeM} onChange={(event) => { setAltitudeM(Number(event.target.value)); clearPlan(); }} className={inputClass} /></label>
+              <label className="text-xs text-hud-muted">Speed · m/s<input type="number" min="0.5" max="15" step="0.5" value={cruiseSpeed} onChange={(event) => { setCruiseSpeed(Number(event.target.value)); clearPlan(); }} className={inputClass} /></label>
             </div>
-            <div className="grid grid-cols-3 gap-2 border-y border-hud-line py-3 text-center">
-              <div><div className="font-mono text-lg text-white">{estimatedCellCount}</div><div className="text-2xs uppercase text-hud-faint">cells</div></div>
-              <div><div className="font-mono text-lg text-white">{estimatedRows} × {estimatedColumns}</div><div className="text-2xs uppercase text-hud-faint">grid</div></div>
-              <div><div className="font-mono text-lg text-white">{(radiusKm * 2).toFixed(1)}</div><div className="text-2xs uppercase text-hud-faint">km side</div></div>
+
+            <div className="border-t border-hud-line pt-3">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-hud-muted"><CameraIcon size={14} /> Downward camera</div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-hud-muted">Horizontal FOV · °<input type="number" min="10" max="170" value={horizontalFov} onChange={(event) => { setHorizontalFov(Number(event.target.value)); clearPlan(); }} className={inputClass} /></label>
+                <label className="text-xs text-hud-muted">Vertical FOV · °<input type="number" min="10" max="170" value={verticalFov} onChange={(event) => { setVerticalFov(Number(event.target.value)); clearPlan(); }} className={inputClass} /></label>
+                <label className="text-xs text-hud-muted">Side overlap · %<input type="number" min="0" max="95" value={sideOverlap} onChange={(event) => { setSideOverlap(Number(event.target.value)); clearPlan(); }} className={inputClass} /></label>
+                <label className="text-xs text-hud-muted">Forward overlap · %<input type="number" min="0" max="95" value={forwardOverlap} onChange={(event) => { setForwardOverlap(Number(event.target.value)); clearPlan(); }} className={inputClass} /></label>
+              </div>
             </div>
-            <button type="submit" disabled={requestState === "planning" || requestState === "starting"} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded bg-teal-300 px-3 text-sm font-semibold text-[#04110f] transition hover:bg-teal-200 focus:outline-none focus:ring-2 focus:ring-teal-200/40 disabled:cursor-wait disabled:opacity-50">
-              <RouteIcon size={16} /> {requestState === "planning" ? "Generating route…" : "Generate flight plan"}
-            </button>
+
+            <div className="grid grid-cols-2 gap-2 border-t border-hud-line pt-3">
+              <label className="text-xs text-hud-muted">Surface<select value={surfaceType} onChange={(event) => { setSurfaceType(event.target.value); clearPlan(); }} className={inputClass}><option value="water">Water</option><option value="land">Land</option></select></label>
+              <label className="flex items-end gap-2 pb-2 text-xs text-hud-muted"><input type="checkbox" checked={terrainEnabled} onChange={(event) => { setTerrainEnabled(event.target.checked); clearPlan(); }} className="h-4 w-4 accent-teal-300" /> Sample terrain API</label>
+            </div>
+            <button type="submit" disabled={requestState === "planning" || requestState === "starting"} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded bg-teal-300 px-3 text-sm font-semibold text-[#04110f] transition hover:bg-teal-200 disabled:cursor-wait disabled:opacity-50"><RouteIcon size={16} />{requestState === "planning" ? "Calculating coverage..." : "Generate coverage plan"}</button>
           </form>
 
           <section className="rounded border border-hud-line bg-hud-panel p-3" aria-live="polite">
             <div className={`text-sm leading-5 ${requestState === "error" ? "text-sig-red" : "text-hud-muted"}`}>{message}</div>
-            {plan ? (
-              <div className="mt-3 space-y-3">
-                <ol className="grid grid-cols-2 gap-2 text-xs">
-                  {plan.phases.map((phase, index) => (
-                    <li key={phase} className="flex items-center gap-2 rounded bg-hud-bg px-2 py-2">
-                      <span className="grid h-5 w-5 place-items-center rounded-full bg-teal-300/15 font-mono text-teal-200">{index + 1}</span>
-                      <span className="capitalize">{phase.replace("_", " ")}</span>
-                    </li>
-                  ))}
-                </ol>
-                <div className="font-mono text-xs leading-5 text-hud-faint">
-                  {plan.cell_count} search cells · {plan.mission_items.length} mission items · {plan.altitude_m} m AGL
-                </div>
-                <button type="button" onClick={() => void requestPlan("/api/mission/simulate")} disabled={requestState === "starting" || requestState === "running"} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-sig-amber/50 bg-sig-amber/10 text-sm font-semibold text-sig-amber transition hover:bg-sig-amber/15 focus:outline-none focus:ring-2 focus:ring-sig-amber/30 disabled:opacity-50">
-                  <PlayIcon size={16} /> {requestState === "starting" ? "Starting simulator…" : requestState === "running" ? "Simulation running" : "Run in simulator"}
-                </button>
+            {plan ? <div className="mt-3 space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <Metric label="footprint" value={`${plan.camera.footprint_width_m} × ${plan.camera.footprint_height_m} m`} />
+                <Metric label="line spacing" value={`${plan.camera.line_spacing_m} m`} />
+                <Metric label="photo trigger" value={`${plan.camera.trigger_distance_m} m`} />
+                <Metric label="flight lines" value={plan.estimate.survey_line_count} />
+                <Metric label="route" value={compactDistance(plan.estimate.total_distance_m)} />
+                <Metric label="duration" value={`${plan.estimate.estimated_minutes} min`} />
+                <Metric label="photos" value={plan.estimate.estimated_photos.toLocaleString()} />
+                <Metric label="mission items" value={plan.estimate.mission_item_count.toLocaleString()} />
+                <Metric label="sorties needed" value={plan.estimate.recommended_sorties} />
               </div>
-            ) : null}
+              <div className="rounded border border-hud-line bg-hud-bg p-2 text-xs leading-5 text-hud-muted"><span className="text-hud-text">Terrain:</span> {terrainSummary}<div className="text-hud-faint">DEM is map context only. Clearance at low altitude uses a downward rangefinder.</div></div>
+              {plan.estimate.blocking_reasons.length ? <div className="rounded border border-sig-red/40 bg-sig-red/10 p-2 text-xs leading-5 text-sig-red"><div className="mb-1 flex items-center gap-2 font-semibold"><ShieldAlertIcon size={14} /> Execution blocked</div><ul className="list-disc pl-4">{plan.estimate.blocking_reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul></div> : null}
+              {plan.estimate.warnings.length ? <ul className="list-disc pl-4 text-xs leading-5 text-sig-amber">{plan.estimate.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
+              {needsRangefinder ? <label className="flex gap-2 rounded border border-sig-amber/40 bg-sig-amber/10 p-2 text-xs leading-5 text-sig-amber"><input type="checkbox" checked={rangefinderConfirmed} onChange={(event) => setRangefinderConfirmed(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-amber-300" /><span>I confirm a downward rangefinder is installed, healthy and tested over this surface.</span></label> : null}
+              <ol className="grid grid-cols-2 gap-2 text-xs">{plan.phases.map((phase, index) => <li key={phase} className="flex items-center gap-2 rounded bg-hud-bg px-2 py-2"><span className="grid h-5 w-5 place-items-center rounded-full bg-teal-300/15 font-mono text-teal-200">{index + 1}</span><span className="capitalize">{phase.replace(/_/g, " ")}</span></li>)}</ol>
+              {plan.mission_items.length ? <button type="button" onClick={downloadMission} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-hud-line bg-hud-bg text-sm font-semibold text-hud-text transition hover:border-teal-300/60 hover:text-teal-200"><DownloadIcon size={16} />Download Mission Planner file</button> : null}
+              <button type="button" onClick={() => void requestPlan("/api/mission/simulate")} disabled={requestState === "starting" || requestState === "running" || simulatorBlocked} title={simulatorBlocked ? "Resolve the safety and sortie checks first" : undefined} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-sig-amber/50 bg-sig-amber/10 text-sm font-semibold text-sig-amber transition hover:bg-sig-amber/15 disabled:cursor-not-allowed disabled:opacity-40"><PlayIcon size={16} />{requestState === "starting" ? "Starting simulator..." : requestState === "running" ? "Simulation running" : "Run checked plan in simulator"}</button>
+            </div> : null}
           </section>
         </aside>
       </div>
