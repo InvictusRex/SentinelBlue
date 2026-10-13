@@ -96,6 +96,12 @@ field. These endpoints are available:
 Live Pixhawk mission execution remains locked. The API returns HTTP `403` for a
 live execution request; planning and preview continue to work.
 
+Open the planner directly without connecting an ESP32 first:
+
+```text
+http://localhost:8080/?view=mission
+```
+
 ## Running the Web Dashboard
 
 From `telemetry/live-web-dashboard` on the laptop or static-host machine:

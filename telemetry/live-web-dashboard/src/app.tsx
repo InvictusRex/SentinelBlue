@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { GaugeIcon, PlugZapIcon, SlidersHorizontalIcon, WavesIcon, WifiIcon } from "lucide-react";
+import { GaugeIcon, MapPinnedIcon, PlugZapIcon, SlidersHorizontalIcon, WavesIcon, WifiIcon } from "lucide-react";
 import { AltitudeCard } from "./components/altitude_card";
 import { AttitudeIndicator } from "./components/attitude_indicator";
 import { BatteryBox } from "./components/battery_box";
@@ -57,7 +57,8 @@ function ConnectionPanel({
   error,
   onChange,
   onCellCountChange,
-  onSubmit
+  onSubmit,
+  onOpenMission
 }: {
   value: string;
   cellCount: number;
@@ -65,6 +66,7 @@ function ConnectionPanel({
   onChange: (value: string) => void;
   onCellCountChange: (value: number) => void;
   onSubmit: () => void;
+  onOpenMission: () => void;
 }) {
   return (
     <div className="hud-grid-bg flex min-h-full w-full items-center justify-center bg-hud-bg p-4 font-sans text-hud-text">
@@ -123,6 +125,15 @@ function ConnectionPanel({
 
         {error ? <p className="mt-3 font-mono text-2xs uppercase tracking-[0.08em] text-sig-red" role="alert">{error}</p> : null}
 
+        <button
+          type="button"
+          onClick={onOpenMission}
+          className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-hud-line bg-white/[0.03] px-4 text-sm font-semibold text-hud-text transition hover:border-teal-300/50 hover:bg-teal-300/10 focus:outline-none focus:ring-2 focus:ring-teal-300/30"
+        >
+          <MapPinnedIcon size={16} />
+          Open mission planner
+        </button>
+
         <div className="mt-4 rounded border border-hud-line bg-hud-bg/70 p-3 font-mono text-2xs leading-5 text-hud-muted">
           <div>Example: 10.160.142.17</div>
           <div>Local: http://&lt;esp-ip&gt;/telemetry.json</div>
@@ -133,6 +144,11 @@ function ConnectionPanel({
   );
 }
 
+function initialView(): "telemetry" | "mission" {
+  const query = new URLSearchParams(window.location.search);
+  return query.get("view") === "mission" || query.get("preview") === "mission" ? "mission" : "telemetry";
+}
+
 export function App({ streaming = true }: { streaming?: boolean }) {
   const [live, setLive] = useState(streaming);
   const [espInput, setEspInput] = useState(initialEspInput);
@@ -140,7 +156,7 @@ export function App({ streaming = true }: { streaming?: boolean }) {
   const [endpoint, setEndpoint] = useState("");
   const [connectError, setConnectError] = useState("");
   const [now, setNow] = useState(Date.now());
-  const [view, setView] = useState<"telemetry" | "mission">("telemetry");
+  const [view, setView] = useState<"telemetry" | "mission">(initialView);
   const t = useTelemetry(live, endpoint, cellCount);
   const warnings = activeWarnings(t);
   const hasTelemetry = t.source.lastUpdated > 0;
@@ -167,7 +183,16 @@ export function App({ streaming = true }: { streaming?: boolean }) {
     }
   };
 
-  if (endpoint.length === 0) {
+  const changeView = (nextView: "telemetry" | "mission") => {
+    setView(nextView);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("preview");
+    if (nextView === "mission") url.searchParams.set("view", "mission");
+    else url.searchParams.delete("view");
+    window.history.replaceState(null, "", url);
+  };
+
+  if (endpoint.length === 0 && view === "telemetry") {
     return (
       <ConnectionPanel
         value={espInput}
@@ -176,6 +201,7 @@ export function App({ streaming = true }: { streaming?: boolean }) {
         onChange={setEspInput}
         onCellCountChange={setCellCount}
         onSubmit={connect}
+        onOpenMission={() => changeView("mission")}
       />
     );
   }
@@ -192,8 +218,8 @@ export function App({ streaming = true }: { streaming?: boolean }) {
       />
 
       <nav className="flex gap-1 border-b border-hud-line bg-hud-panel px-3 py-2" aria-label="Dashboard views">
-        <button type="button" onClick={() => setView("telemetry")} className={`rounded px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-teal-300/30 ${view === "telemetry" ? "bg-teal-300 text-[#04110f]" : "text-hud-muted hover:bg-white/5 hover:text-white"}`}>Telemetry</button>
-        <button type="button" onClick={() => setView("mission")} className={`rounded px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-teal-300/30 ${view === "mission" ? "bg-teal-300 text-[#04110f]" : "text-hud-muted hover:bg-white/5 hover:text-white"}`}>Mission planner</button>
+        <button type="button" onClick={() => changeView("telemetry")} className={`rounded px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-teal-300/30 ${view === "telemetry" ? "bg-teal-300 text-[#04110f]" : "text-hud-muted hover:bg-white/5 hover:text-white"}`}>Telemetry</button>
+        <button type="button" onClick={() => changeView("mission")} className={`rounded px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-teal-300/30 ${view === "mission" ? "bg-teal-300 text-[#04110f]" : "text-hud-muted hover:bg-white/5 hover:text-white"}`}>Mission planner</button>
       </nav>
 
       {view === "mission" ? (
