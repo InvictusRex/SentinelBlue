@@ -146,7 +146,7 @@ class MAVLinkManager:
         """Commands Pixhawk into requested flight mode (e.g. AUTO, LOITER, RTL, GUIDED)."""
         mode_upper = mode.upper()
         if self.simulate or not self.mav:
-            print(f"[✓] Simulation: Flight mode switched to '{mode_upper}'")
+            print(f"[OK] Simulation: Flight mode switched to '{mode_upper}'")
             with self._lock:
                 self.state["flight_mode"] = mode_upper
                 if mode_upper == "AUTO":
@@ -194,7 +194,7 @@ class MAVLinkManager:
     def set_arm(self, arm: bool = True, force: bool = False) -> bool:
         """Arms or disarms the motors."""
         if self.simulate or not self.mav:
-            print(f"[✓] Simulation: Motors {'ARMED' if arm else 'DISARMED'}")
+            print(f"[OK] Simulation: Motors {'ARMED' if arm else 'DISARMED'}")
             with self._lock:
                 self.state["armed"] = arm
             return True
@@ -248,7 +248,7 @@ class MAVLinkManager:
     def upload_mission_items(self, items: List[Dict[str, Any]]) -> bool:
         """Thread-safe mission upload to Pixhawk using MAVLink Mission Protocol."""
         if self.simulate or not self.mav:
-            print(f"[✓] Simulation: Loaded {len(items)} mission items into simulator memory.")
+            print(f"[OK] Simulation: Loaded {len(items)} mission items into simulator memory.")
             with self._lock:
                 self.sim_mission_items = items
                 self.sim_mission_index = 1
@@ -662,7 +662,7 @@ class MAVLinkManager:
                 if hb:
                     tgt_sys = getattr(self.mav, "target_system", 1) or 1
                     tgt_comp = getattr(self.mav, "target_component", 1) or 1
-                    print(f"[✓] Heartbeat received from Pixhawk (System: {tgt_sys}, Component: {tgt_comp})")
+                    print(f"[OK] Heartbeat received from Pixhawk (System: {tgt_sys}, Component: {tgt_comp})")
                     self._handle_mavlink_message(hb, mavutil)
                 else:
                     self._set_connection_state(False, "Serial open but no MAVLink heartbeat")

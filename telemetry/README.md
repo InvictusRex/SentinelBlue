@@ -18,6 +18,9 @@ Entry point for the Raspberry Pi telemetry relay. It starts the MAVLink manager,
 ### `handheld-nrf-monitor/pi-code/mavlink_manager.py`
 Manages the Pixhawk MAVLink connection or simulator and keeps the shared telemetry state used by the NRF transmitter.
 
+### `handheld-nrf-monitor/pi-code/companion_mode.py`
+Evaluates the companion computer state from Pixhawk link freshness, battery, GPS, and Raspberry Pi temperature. It is monitor-only: every state has command output disabled, including `assist_ready` and `failsafe`.
+
 ### `handheld-nrf-monitor/pi-code/radio_tx_module.py`
 Packs selected telemetry into typed NRF24L01+ frames and broadcasts them to the ESP32 handheld receiver.
 
@@ -44,6 +47,21 @@ On the Raspberry Pi:
 cd telemetry/handheld-nrf-monitor/pi-code
 python3 main.py --port /dev/serial0 --baud 115200 --radio-rate 5
 ```
+
+The default companion mode is `monitor`. To validate whether the system is
+healthy enough for a future assist feature without sending flight commands:
+
+```bash
+python3 main.py --simulate --no-radio --companion-mode assist
+```
+
+Companion states are:
+
+- `disabled` - state evaluation is disabled by configuration.
+- `monitor` - telemetry and companion health are current.
+- `assist_ready` - link, GPS, battery, and computer health checks passed. Flight command output remains disabled.
+- `degraded` - one or more required inputs are unavailable or outside the configured limits.
+- `failsafe` - a critical battery or temperature condition exists, or telemetry became stale while the aircraft was armed. This is a reported state; Pixhawk remains responsible for flight stabilization and configured vehicle failsafes.
 
 ## Running the Web Dashboard
 

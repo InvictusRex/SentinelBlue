@@ -64,7 +64,7 @@ class RadioTXModule:
         self.running = True
         self.thread = threading.Thread(target=self._tx_loop, daemon=True)
         self.thread.start()
-        print(f"[✓] Module 1 (Radio TX): Running at {self.rate_hz} Hz ({'HARDWARE SPI' if self.radio_available else 'SIMULATED MOCK'}).")
+        print(f"[OK] Module 1 (Radio TX): Running at {self.rate_hz} Hz ({'HARDWARE SPI' if self.radio_available else 'SIMULATED MOCK'}).")
 
     def stop(self):
         self.running = False
@@ -348,4 +348,4 @@ if __name__ == "__main__":
     time.sleep(2.0)
     tx.stop()
     mgr.stop()
-    print("[✓] RadioTXModule test passed.")
+    print("[OK] RadioTXModule test passed.")
