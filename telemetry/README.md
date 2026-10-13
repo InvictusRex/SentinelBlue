@@ -141,18 +141,11 @@ host firewall allows inbound TCP port 8080. Stop it with `docker compose down`.
 
 The dashboard reads `http://<esp-ip>/telemetry.json` directly from each viewer's
 browser during local use. A viewer must be able to reach the ESP32 on the same
-network. An HTTPS deployment, including GitHub Pages, requires a complete HTTPS
+network. An HTTPS deployment requires a complete HTTPS
 telemetry endpoint because browsers block insecure HTTP telemetry requests from
 secure pages. Remote access requires an authenticated HTTPS or MQTT relay between
 the vehicle and dashboard; publishing Docker port 8080 does not make the ESP32
 endpoint reachable over the Internet.
-
-## GitHub Pages
-
-The repository includes a GitHub Actions workflow that validates and publishes
-the dashboard after changes reach `main`. Enable **GitHub Actions** as the Pages
-source in the repository settings. The Pages deployment hosts the static frontend
-only and does not run Docker, Nginx, or a telemetry relay.
 
 ## Mission Control
 

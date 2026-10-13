@@ -1,6 +1,6 @@
 # Live Web Dashboard
 
-The dashboard displays ESP32 drone telemetry through a React and Vite frontend. It supports local Docker hosting and static deployment through GitHub Pages.
+The dashboard displays ESP32 drone telemetry through a React and Vite frontend. Docker and Nginx provide the production runtime.
 
 ## Local development
 
@@ -34,12 +34,6 @@ ESP32 or companion computer -> authenticated HTTPS or MQTT service -> HTTPS tele
 ```
 
 The relay should authenticate the vehicle, encrypt traffic, restrict allowed browser origins, and return the same JSON fields as the ESP32 endpoint. Do not expose the ESP32 HTTP server directly to the internet.
-
-## GitHub Pages
-
-The `telemetry_web_pages.yml` workflow builds the dashboard after the pull request is merged into `main`. Repository administrators must select **GitHub Actions** as the Pages source once in the repository settings.
-
-The Pages deployment hosts only the frontend. It does not run Docker, Nginx, MQTT, or an API server.
 
 ## Telemetry behavior
 
