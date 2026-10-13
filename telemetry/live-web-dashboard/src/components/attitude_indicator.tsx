@@ -1,20 +1,30 @@
+import { lazy, Suspense } from "react";
 import { CompassIcon } from "lucide-react";
 import { Chip, Panel } from "./panel";
 import type { AttitudeState } from "../types/telemetry";
-import { AttitudeScene } from "./attitude_scene";
 
-export function AttitudeIndicator({ attitude, className }: { attitude: AttitudeState; className?: string }) {
+const AttitudeScene = lazy(() => import("./attitude_scene").then((module) => ({ default: module.AttitudeScene })));
+
+export function AttitudeIndicator({ attitude, available, className }: { attitude: AttitudeState; available: boolean; className?: string }) {
   const { roll, pitch, yaw } = attitude;
 
   return (
     <Panel
       label="Attitude · Heading"
       icon={<CompassIcon size={12} />}
-      meta={<Chip tone="cyan">AHRS LOCK</Chip>}
+      meta={<Chip tone={available ? "cyan" : "amber"}>{available ? "AHRS LOCK" : "NO DATA"}</Chip>}
       className={className}
       bodyClassName="flex flex-col gap-3"
     >
-      <AttitudeScene attitude={attitude} />
+      {available ? (
+        <Suspense fallback={<div className="min-h-[220px] flex-1 animate-pulse rounded bg-hud-raise" aria-label="Loading 3D attitude view" />}>
+          <AttitudeScene attitude={attitude} />
+        </Suspense>
+      ) : (
+        <div className="grid min-h-[220px] flex-1 place-items-center rounded bg-hud-raise font-mono text-xs uppercase tracking-[0.08em] text-hud-faint">
+          No attitude telemetry
+        </div>
+      )}
 
       <dl className="grid shrink-0 grid-cols-3 gap-2">
         {[
@@ -27,7 +37,7 @@ export function AttitudeIndicator({ attitude, className }: { attitude: AttitudeS
               <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: r.color }} aria-hidden="true" />
               {r.label}
             </dt>
-            <dd className="tabular font-mono text-[13px] font-medium leading-4 text-hud-text">{r.value.toFixed(1)}°</dd>
+            <dd className="tabular font-mono text-[13px] font-medium leading-4 text-hud-text">{available ? `${r.value.toFixed(1)}°` : "--"}</dd>
           </div>
         ))}
       </dl>

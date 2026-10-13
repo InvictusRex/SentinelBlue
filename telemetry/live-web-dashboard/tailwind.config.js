@@ -25,11 +25,11 @@ export default {
         }
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "monospace"]
+        sans: ["system-ui", "Segoe UI", "sans-serif"],
+        mono: ["ui-monospace", "Cascadia Code", "Consolas", "monospace"]
       },
       fontSize: {
-        "2xs": ["10px", "12px"]
+        "2xs": ["11px", "14px"]
       }
     }
   },

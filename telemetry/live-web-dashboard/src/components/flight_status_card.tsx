@@ -12,11 +12,16 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export function FlightStatusCard({ flight, className }: { flight: FlightState; className?: string }) {
+  const armedLabel = flight.armed === null ? "UNKNOWN" : flight.armed ? "ARMED" : "DISARMED";
+  const armedTone = flight.armed === null ? "amber" : flight.armed ? "red" : "neutral";
+  const failsafeLabel = flight.failsafe === null ? "UNKNOWN" : flight.failsafe ? "TRIGGERED" : "CLEAR";
+  const failsafeTone = flight.failsafe === null ? "amber" : flight.failsafe ? "red" : "green";
+
   return (
     <Panel
       label="Flight Status"
       icon={<PlaneIcon size={12} />}
-      meta={<Chip tone={flight.armed ? "red" : "neutral"}>{flight.armed ? "ARMED" : "DISARMED"}</Chip>}
+      meta={<Chip tone={armedTone}>{armedLabel}</Chip>}
       className={className}
       bodyClassName="flex flex-col justify-center gap-1"
     >
@@ -24,7 +29,7 @@ export function FlightStatusCard({ flight, className }: { flight: FlightState; c
         <span className="font-mono text-[13px] font-semibold tracking-wide text-sig-cyan">{flight.mode}</span>
       </Row>
       <Row label="Failsafe">
-        <Chip tone={flight.failsafe ? "red" : "green"}>{flight.failsafe ? "TRIGGERED" : "CLEAR"}</Chip>
+        <Chip tone={failsafeTone}>{failsafeLabel}</Chip>
       </Row>
       <Row label="Mission">
         <span className="truncate font-mono text-[12px] text-hud-text">{flight.mission}</span>

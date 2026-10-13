@@ -7,7 +7,7 @@ export const vehicle = {
   linkPath: "MAVLINK · NRF24 · ESP32-WIFI"
 };
 
-export const cellLabels = ["1S", "2S", "3S", "4S"];
+export const cellLabels = ["1S", "2S", "3S", "4S", "5S", "6S"];
 
 export const pidSeries: SeriesDef[] = [
   { key: "roll", label: "ROLL", color: "#4c8dff" },

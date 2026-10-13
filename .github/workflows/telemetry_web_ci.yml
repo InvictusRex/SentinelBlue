@@ -1,0 +1,33 @@
+name: Telemetry web CI
+
+on:
+  pull_request:
+    paths:
+      - "telemetry/live-web-dashboard/**"
+      - ".github/workflows/telemetry_web_ci.yml"
+  push:
+    branches:
+      - feature/telemetry
+    paths:
+      - "telemetry/live-web-dashboard/**"
+      - ".github/workflows/telemetry_web_ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: telemetry/live-web-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: telemetry/live-web-dashboard/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: docker build --tag sentinelblue-telemetry-web:test .

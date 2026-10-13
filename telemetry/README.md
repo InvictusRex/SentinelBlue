@@ -54,7 +54,7 @@ npm ci
 npm run dev -- --host 0.0.0.0
 ```
 
-Open the dashboard URL and enter the ESP32 IP shown on the OLED. The dashboard reads:
+Open the dashboard URL, select the battery cell count, and enter the ESP32 IP shown on the OLED. The dashboard reads:
 
 ```text
 http://<esp-ip>/telemetry.json
@@ -82,11 +82,20 @@ The production build is served at `http://localhost:8080` on the Docker host.
 Other devices on the same network can use `http://<docker-host-ip>:8080` if the
 host firewall allows inbound TCP port 8080. Stop it with `docker compose down`.
 
-The dashboard still reads `http://<esp-ip>/telemetry.json` directly from each
-viewer's browser. A viewer must be able to reach the ESP32 on the network. For
-access from outside the local network, deploy the image on a reachable host
-with HTTPS and a suitable telemetry access path; publishing Docker port 8080
-alone does not make the ESP32 endpoint reachable over the Internet.
+The dashboard reads `http://<esp-ip>/telemetry.json` directly from each viewer's
+browser during local use. A viewer must be able to reach the ESP32 on the same
+network. An HTTPS deployment, including GitHub Pages, requires a complete HTTPS
+telemetry endpoint because browsers block insecure HTTP telemetry requests from
+secure pages. Remote access requires an authenticated HTTPS or MQTT relay between
+the vehicle and dashboard; publishing Docker port 8080 does not make the ESP32
+endpoint reachable over the Internet.
+
+## GitHub Pages
+
+The repository includes a GitHub Actions workflow that validates and publishes
+the dashboard after changes reach `main`. Enable **GitHub Actions** as the Pages
+source in the repository settings. The Pages deployment hosts the static frontend
+only and does not run Docker, Nginx, or a telemetry relay.
 
 ## Mission Control
 

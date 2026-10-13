@@ -5,21 +5,20 @@ import { Chip } from "./panel";
 type TopBarProps = {
   live: boolean;
   onToggleLive: () => void;
-  armed: boolean;
+  armed: boolean | null;
   mode: string;
-  clock: number;
-  warning: string | null;
+  now: number;
+  warnings: string[];
 };
 
-function stamp(clock: number): string {
-  const total = clock * 4;
-  const h = String(Math.floor(total / 3600) % 24).padStart(2, "0");
-  const m = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
-  const s = String(total % 60).padStart(2, "0");
-  return `${h}:${m}:${s}Z`;
+function stamp(now: number): string {
+  return new Date(now).toISOString().slice(11, 19) + "Z";
 }
 
-export function TopBar({ live, onToggleLive, armed, mode, clock, warning }: TopBarProps) {
+export function TopBar({ live, onToggleLive, armed, mode, now, warnings }: TopBarProps) {
+  const armedLabel = armed === null ? "ARMED UNKNOWN" : armed ? "ARMED" : "DISARMED";
+  const armedTone = armed === null ? "amber" : armed ? "red" : "neutral";
+
   return (
     <header className="flex h-11 shrink-0 items-center gap-3 border-b border-hud-line bg-hud-panel px-3">
       <div className="flex items-center gap-2">
@@ -28,25 +27,27 @@ export function TopBar({ live, onToggleLive, armed, mode, clock, warning }: TopB
         </span>
         <div className="leading-none">
           <div className="font-mono text-[12px] font-semibold tracking-wide text-hud-text">{vehicle.name}</div>
-          <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-hud-faint">{vehicle.linkPath}</div>
+          <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-hud-faint">{vehicle.linkPath}</div>
         </div>
       </div>
 
       <div className="hidden items-center gap-1.5 lg:flex">
         <Chip tone="blue">{mode}</Chip>
-        <Chip tone={armed ? "red" : "neutral"}>{armed ? "ARMED" : "DISARMED"}</Chip>
+        <Chip tone={armedTone}>{armedLabel}</Chip>
         <Chip tone="neutral">{vehicle.sysId}</Chip>
       </div>
 
-      {warning ? (
-        <div className="ml-auto flex min-w-0 items-center gap-1.5 rounded border border-sig-amber/40 bg-sig-amber/10 px-2 py-1 text-sig-amber">
+      {warnings.length > 0 ? (
+        <div className="ml-auto hidden min-w-0 items-center gap-1.5 rounded border border-sig-amber/40 bg-sig-amber/10 px-2 py-1 text-sig-amber md:flex">
           <ShieldAlertIcon size={12} />
-          <span className="truncate font-mono text-2xs font-semibold uppercase tracking-[0.08em]">{warning}</span>
+          <span className="truncate font-mono text-2xs font-semibold uppercase tracking-[0.08em]">
+            {warnings[0]}{warnings.length > 1 ? ` +${warnings.length - 1}` : ""}
+          </span>
         </div>
       ) : null}
 
-      <div className={`flex items-center gap-2 ${warning ? "" : "ml-auto"}`}>
-        <span className="tabular hidden font-mono text-[11px] text-hud-dim sm:block">{stamp(clock)}</span>
+      <div className={`flex items-center gap-2 ${warnings.length > 0 ? "ml-auto md:ml-0" : "ml-auto"}`}>
+        <time className="tabular hidden font-mono text-[11px] text-hud-dim sm:block" dateTime={new Date(now).toISOString()}>{stamp(now)}</time>
         <button
           type="button"
           onClick={onToggleLive}
@@ -54,7 +55,7 @@ export function TopBar({ live, onToggleLive, armed, mode, clock, warning }: TopB
           aria-pressed={live}
         >
           {live ? <PauseIcon size={11} /> : <PlayIcon size={11} />}
-          {live ? "Live" : "Hold"}
+          {live ? "Pause" : "Resume"}
         </button>
       </div>
     </header>
