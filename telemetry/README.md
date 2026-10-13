@@ -63,6 +63,39 @@ Companion states are:
 - `degraded` - one or more required inputs are unavailable or outside the configured limits.
 - `failsafe` - a critical battery or temperature condition exists, or telemetry became stale while the aircraft was armed. This is a reported state; Pixhawk remains responsible for flight stabilization and configured vehicle failsafes.
 
+## Companion Search Mission Planner
+
+The Raspberry Pi service exposes a planning API on port `8765`. The dashboard's
+**Mission planner** view lets an operator select a search centre on the offline
+coordinate plot, enter a radius and altitude, and preview the complete route.
+
+The planner creates four cells per kilometre of search radius:
+
+- `1 km` radius → `4` cells
+- `2 km` radius → `8` cells
+- `3 km` radius → `12` cells
+
+Cells are visited in a lawnmower pattern. The generated mission contains home,
+takeoff, every search-cell centre, a return waypoint, and landing. Radius is
+limited to `0.25–10 km` and altitude to `5–120 m`.
+
+Start the Raspberry Pi simulator and API:
+
+```bash
+python3 main.py --simulate --no-radio --companion-mode assist --companion-api-port 8765
+```
+
+Then enter `http://<raspberry-pi-ip>:8765` in the dashboard's companion API
+field. These endpoints are available:
+
+- `GET /api/health` - reports connection and simulation state.
+- `POST /api/mission/plan` - validates inputs and returns the generated plan.
+- `POST /api/mission/simulate` - loads and starts the plan only when the Pi
+  service was started with `--simulate`.
+
+Live Pixhawk mission execution remains locked. The API returns HTTP `403` for a
+live execution request; planning and preview continue to work.
+
 ## Running the Web Dashboard
 
 From `telemetry/live-web-dashboard` on the laptop or static-host machine:

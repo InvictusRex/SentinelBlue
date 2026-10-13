@@ -20,6 +20,7 @@ from sbc_monitor import SBCMonitor
 from mavlink_manager import MAVLinkManager
 from radio_tx_module import RadioTXModule
 from companion_mode import CompanionModeController, RequestedCompanionMode
+from companion_api import CompanionAPIServer
 
 def main():
     parser = argparse.ArgumentParser(description="Drone Telemetry Pi Relay")
@@ -34,6 +35,8 @@ def main():
         default=RequestedCompanionMode.MONITOR.value,
         help="Companion state evaluation mode; assist only checks readiness and never sends commands",
     )
+    parser.add_argument("--companion-api-port", type=int, default=8765, help="Mission planning API port")
+    parser.add_argument("--no-companion-api", action="store_true", help="Disable the mission planning API")
     args = parser.parse_args()
 
     print("=" * 76)
@@ -43,7 +46,7 @@ def main():
     print("[*] Web Dashboard:           laptop/static host reads ESP32 Wi-Fi JSON")
     print(f"[*] Radio TX Broadcast Rate: {args.radio_rate} Hz ({'DISABLED' if args.no_radio else 'ENABLED'})")
     print(f"[*] Operation Mode:          {'SIMULATION' if args.simulate else 'LIVE PIXHAWK'}")
-    print(f"[*] Companion Mode:          {args.companion_mode.upper()} (command output disabled)")
+    print(f"[*] Companion Mode:          {args.companion_mode.upper()} (live command output disabled)")
     print("----------------------------------------------------------------------------")
 
     # 1. SBC Monitor
@@ -55,6 +58,10 @@ def main():
     # 2. Shared MAVLink Manager
     mav_manager = MAVLinkManager(port=args.port, baud=args.baud, simulate=args.simulate)
     mav_manager.start()
+
+    companion_api = CompanionAPIServer(mav_manager, port=args.companion_api_port)
+    if not args.no_companion_api:
+        companion_api.start()
 
     # 3. NRF24 Radio Transmitter
     radio_module = RadioTXModule(
@@ -76,6 +83,7 @@ def main():
     # Graceful exit handler
     def shutdown(signum, frame):
         print("\n[*] Stopping telemetry relay...")
+        companion_api.stop()
         radio_module.stop()
         mav_manager.stop()
         print("[OK] All modules stopped cleanly.")

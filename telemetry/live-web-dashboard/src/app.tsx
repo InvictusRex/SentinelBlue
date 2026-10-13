@@ -6,6 +6,7 @@ import { BatteryBox } from "./components/battery_box";
 import { FlightStatusCard } from "./components/flight_status_card";
 import { LinkCard } from "./components/link_card";
 import { NavSignalBox } from "./components/nav_signal_box";
+import { MissionPlanner } from "./components/mission_planner";
 import { SbcStatusCard } from "./components/sbc_status_card";
 import { TopBar } from "./components/top_bar";
 import { gyroSeries, motorSeries, pidSeries, vehicle } from "./data/telemetry";
@@ -139,6 +140,7 @@ export function App({ streaming = true }: { streaming?: boolean }) {
   const [endpoint, setEndpoint] = useState("");
   const [connectError, setConnectError] = useState("");
   const [now, setNow] = useState(Date.now());
+  const [view, setView] = useState<"telemetry" | "mission">("telemetry");
   const t = useTelemetry(live, endpoint, cellCount);
   const warnings = activeWarnings(t);
   const hasTelemetry = t.source.lastUpdated > 0;
@@ -188,6 +190,19 @@ export function App({ streaming = true }: { streaming?: boolean }) {
         now={now}
         warnings={warnings}
       />
+
+      <nav className="flex gap-1 border-b border-hud-line bg-hud-panel px-3 py-2" aria-label="Dashboard views">
+        <button type="button" onClick={() => setView("telemetry")} className={`rounded px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-teal-300/30 ${view === "telemetry" ? "bg-teal-300 text-[#04110f]" : "text-hud-muted hover:bg-white/5 hover:text-white"}`}>Telemetry</button>
+        <button type="button" onClick={() => setView("mission")} className={`rounded px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-teal-300/30 ${view === "mission" ? "bg-teal-300 text-[#04110f]" : "text-hud-muted hover:bg-white/5 hover:text-white"}`}>Mission planner</button>
+      </nav>
+
+      {view === "mission" ? (
+        <MissionPlanner
+          currentLatitude={t.nav.lat}
+          currentLongitude={t.nav.lon}
+          telemetryAvailable={hasTelemetry}
+        />
+      ) : (
 
       <main className="flex flex-1 flex-col gap-2 p-2.5 xl:min-h-0">
         {warnings.length > 0 ? (
@@ -305,6 +320,7 @@ export function App({ streaming = true }: { streaming?: boolean }) {
           </button>
         </footer>
       </main>
+      )}
     </div>
   );
 }
