@@ -15,6 +15,9 @@ import time
 import signal
 import argparse
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "autonomous-grid-search" / "backend"))
 
 from sbc_monitor import SBCMonitor
 from mavlink_manager import MAVLinkManager

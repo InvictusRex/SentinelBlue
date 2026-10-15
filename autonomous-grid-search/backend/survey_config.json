@@ -8,6 +8,10 @@
   "forward_overlap_percent": 75,
   "surface_type": "water",
   "terrain_enabled": false,
+  "max_cell_side_m": 50,
+  "swarm_drone_count": 4,
+  "battery_swap_seconds": 120,
+  "square_grid_angle_deg": 0,
   "survey_options": {
     "camera_model": "fov",
     "camera_orientation": "landscape",

@@ -1,5 +1,16 @@
 node_modules/
+node_modules
 dist/
 *.tsbuildinfo
 __pycache__/
 *.py[cod]
+
+# Trail-code's graft map is regenerable local state (run `trail build`).
+/graft/
+
+# Local agent state and notes.
+/.codex/
+/.agent
+/.agents/
+/.trail/
+/.ignore

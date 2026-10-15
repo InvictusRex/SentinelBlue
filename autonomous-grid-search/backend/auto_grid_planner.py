@@ -11,7 +11,7 @@ import pathlib
 import time
 from typing import Any, Dict
 
-from pyproj import CRS, Transformer, Geod
+from pyproj import CRS, Transformer
 from shapely import affinity
 from shapely.geometry import LineString, Polygon, box
 from shapely.ops import unary_union
@@ -39,14 +39,6 @@ def build_radius_survey(payload, telemetry):
         raise ValueError("Pi survey_config.json is missing or invalid; check the aircraft configuration") from exc
     if not isinstance(config, dict) or not isinstance(config.get("survey_options"), dict):
         raise ValueError("Pi survey_config.json must include survey_options")
-    geod = Geod(ellps="WGS84")
-    boundary = []
-    for index in range(64):
-        # Circumscribe the requested circle so polygon approximation never
-        # silently excludes the rim of the user's search area.
-        longitude, latitude, _ = geod.fwd(center["longitude"], center["latitude"], index * 360 / 64,
-                                         radius / math.cos(math.pi / 64))
-        boundary.append({"latitude": latitude, "longitude": longitude})
     source = dict(telemetry)
     try:
         fresh = all(0 <= time.time() - float(source.get(key, 0)) <= 5
@@ -55,10 +47,8 @@ def build_radius_survey(payload, telemetry):
         fresh = False
     if not fresh or source.get("gps_fix_type") not in ("3D FIX", "DGPS", "RTK FLT", "RTK FIX"):
         source["connected"] = False
-    request = {**config, "boundary": boundary}
-    request.pop("home", None)
-    plan = build_auto_grid_mission(request, source)
-    plan.data["search_area"] = {"center": center, "radius_m": radius}
+    plan = build_cell_survey(config, center, radius, source)
+    plan.data["search_area"] = {"center": center, "radius_m": radius, "shape": "square", "side_m": radius * 2}
     plan.data["profile_name"] = str(config.get("profile_name", "pi_survey_profile"))
     plan.data["terrain_enabled"] = config.get("terrain_enabled") is True
     plan.data["surface_type"] = config.get("surface_type", "water")
@@ -68,6 +58,114 @@ def build_radius_survey(payload, telemetry):
         for sortie in plan.data["sorties"]:
             sortie["blocking_reasons"][0] = reason
     return plan
+
+
+def build_cell_survey(config, center, half_side, telemetry):
+    """Partition a metric square; every cell gets a full coverage mission.
+
+    Drone assignments and timelines are for visual simulation only. Shared
+    launch/transit paths are not deconflicted for simultaneous real flight.
+    """
+    maximum = number(config, "max_cell_side_m", 50, 5, 1000)
+    drone_count = number(config, "swarm_drone_count", 4, 1, 8)
+    battery_swap = number(config, "battery_swap_seconds", 120, 0, 3600)
+    if not drone_count.is_integer():
+        raise ValueError("swarm_drone_count must be an integer")
+    count = math.ceil(2 * half_side / maximum)
+    if count * count > 100:
+        raise ValueError("Search exceeds 100 square cells; reduce the search extent or adjust the Pi cell size")
+    cell_side = 2 * half_side / count
+    local = CRS.from_proj4(f"+proj=aeqd +lat_0={center['latitude']} +lon_0={center['longitude']} +datum=WGS84 +units=m")
+    to_geo = Transformer.from_crs(local, "EPSG:4326", always_xy=True)
+    to_local = Transformer.from_crs("EPSG:4326", local, always_xy=True)
+
+    def geo(x, y):
+        lon, lat = to_geo.transform(x, y)
+        return {"latitude": lat, "longitude": lon}
+
+    def corners(west, south, east, north):
+        return [geo(west, south), geo(east, south), geo(east, north), geo(west, north)]
+
+    home = position(telemetry, "vehicle position") if telemetry.get("connected") else center
+    home_source = "vehicle_position" if telemetry.get("connected") else "area_preview_only"
+    drones = [{"drone_id": index + 1, "cell_ids": [], "sortie_ids": [], "duration_s": 0.0, "segments": []}
+              for index in range(min(int(drone_count), count * count))]
+    cells, sorties, lines, components = [], [], [], []
+    options = {**config["survey_options"], "angle_mode": "manual",
+               "grid_angle_deg": number(config, "square_grid_angle_deg", 0, 0, 179.99)}
+
+    for row in range(count):
+        for col in (range(count) if row % 2 == 0 else reversed(range(count))):
+            cell_id = row * count + col + 1
+            west, south = -half_side + col * cell_side, -half_side + row * cell_side
+            boundary = corners(west, south, west + cell_side, south + cell_side)
+            data = build_auto_grid_mission({**config, "survey_options": options, "home": home, "boundary": boundary}, {}).to_dict()
+            drone = min(drones, key=lambda entry: (entry["duration_s"], entry["drone_id"]))
+            drone["cell_ids"].append(cell_id)
+            cell_sorties = []
+            for sortie in data["sorties"]:
+                original_id = sortie["sortie_id"]
+                sortie_id = len(sorties) + 1
+                sortie.update(sortie_id=sortie_id, cell_id=cell_id, drone_id=drone["drone_id"])
+                if home_source == "area_preview_only":
+                    sortie["ready"] = False
+                    sortie["mission_items"] = []
+                    sortie["blocking_reasons"].insert(0, "Pi needs fresh 3D GPS from the disarmed vehicle to determine launch/home")
+                sorties.append(sortie)
+                cell_sorties.append(sortie_id)
+                drone["sortie_ids"].append(sortie_id)
+                for track in data["survey_lines"]:
+                    if track["sortie_id"] == original_id:
+                        # Copy: original local IDs are needed for subsequent sorties.
+                        lines.append({**track, "cell_id": cell_id, "drone_id": drone["drone_id"],
+                                      "sortie_id": sortie_id, "line_index": len(lines) + 1})
+                start_time = drone["duration_s"]
+
+                def segment(start, end, duration, phase):
+                    begin = drone["duration_s"]
+                    drone["segments"].append({"start_s": round(begin, 3), "end_s": round(begin + duration, 3),
+                                              "start": start, "end": end, "phase": phase,
+                                              "cell_id": cell_id, "sortie_id": sortie_id})
+                    drone["duration_s"] += duration
+
+                if len(drone["sortie_ids"]) > 1:
+                    segment(home, home, battery_swap, "battery_swap")
+                segment(home, home, 60, "takeoff")
+                route = sortie["route"]
+                for index, (a, b) in enumerate(zip(route, route[1:])):
+                    distance = math.dist(to_local.transform(a["longitude"], a["latitude"]), to_local.transform(b["longitude"], b["latitude"]))
+                    survey = index % 2 == 1
+                    segment(a, b, max(.001, distance / data["cruise_speed_m_s"]), "survey" if survey else "transit")
+                    if survey:
+                        segment(b, b, 2 + number(options, "turn_seconds", 3, 0, 30), "turn")
+                segment(home, home, 60, "landing")
+                sortie["scheduled_start_s"] = round(start_time, 3)
+                sortie["scheduled_end_s"] = round(drone["duration_s"], 3)
+            cells.append({"cell_id": cell_id, "row": row + 1, "column": col + 1, "side_m": cell_side,
+                          "boundary": boundary, "center": geo(west + cell_side / 2, south + cell_side / 2),
+                          "drone_id": drone["drone_id"], "sortie_ids": cell_sorties,
+                          "coverage_percent": data["coverage_percent"], "line_count": len(data["survey_lines"])})
+            components.append(data)
+            if len(sorties) > MAX_SORTIES or len(lines) > MAX_LINES:
+                raise ValueError("Search exceeds 100 sorties or 10000 lines; reduce the search extent")
+    for drone in drones:
+        drone["duration_s"] = round(drone["duration_s"], 3)
+    result = dict(components[0])
+    result.update(center=center, home=home, home_source=home_source, boundary=corners(-half_side, -half_side, half_side, half_side),
+                  cells=sorted(cells, key=lambda cell: cell["cell_id"]), cell_count=len(cells),
+                  max_cell_side_m=maximum, cell_side_m=cell_side, rows=count, columns=count,
+                  area_m2=round((2 * half_side) ** 2, 1), sorties=sorties, survey_lines=lines,
+                  coverage_percent=round(sum(item["coverage_percent"] for item in components) / len(components), 2),
+                  swarm={"simulation_only": True, "drone_count": len(drones), "drones": drones,
+                         "duration_s": max(drone["duration_s"] for drone in drones),
+                         "warning": "Visual swarm simulation only. Shared home and transit paths are not collision-deconflicted; real multi-drone launch is disabled."})
+    result["estimate"] = {**components[0]["estimate"], "survey_line_count": len(lines), "recommended_sorties": len(sorties),
+                          "total_distance_m": round(sum(s["distance_m"] for s in sorties), 1),
+                          "estimated_minutes": round(sum(s["estimated_minutes"] for s in sorties), 1),
+                          "estimated_photos": sum(s["estimated_photos"] for s in sorties),
+                          "simulation_ready": all(s["ready"] for s in sorties),
+                          "blocking_reasons": list(dict.fromkeys(reason for s in sorties for reason in s["blocking_reasons"]))}
+    return AutoGridPlan(result)
 
 
 def number(data, key, default, minimum, maximum):

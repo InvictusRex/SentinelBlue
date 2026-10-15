@@ -6,6 +6,7 @@ import time
 from unittest.mock import patch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "telemetry" / "handheld-nrf-monitor" / "pi-code"))
 from auto_grid_planner import build_auto_grid_mission, build_radius_survey
 from mavlink_manager import MAVLinkManager
 
@@ -30,8 +31,9 @@ class AutoGridTests(unittest.TestCase):
         self.assertEqual(5, plan["altitude_m"])
         self.assertEqual(center, plan["home"])
         self.assertEqual("vehicle_position", plan["home_source"])
-        self.assertEqual(64, len(plan["boundary"]))
-        self.assertGreaterEqual(plan["area_m2"], math.pi * 25 ** 2)
+        self.assertEqual(4, len(plan["boundary"]))
+        self.assertEqual(2500, plan["area_m2"])
+        self.assertEqual("square", plan["search_area"]["shape"])
         self.assertLess(plan["camera"]["line_spacing_m"], 3)
         self.assertTrue(all(sortie["ready"] for sortie in plan["sorties"]))
         stale = build_radius_survey(request, {**telemetry, "last_gps_timestamp": 0}).to_dict()
@@ -39,6 +41,46 @@ class AutoGridTests(unittest.TestCase):
         self.assertIn("fresh 3D GPS", stale["estimate"]["blocking_reasons"][0])
         with self.assertRaisesRegex(ValueError, "current flight"):
             build_radius_survey(request, {**telemetry, "armed": True})
+
+    def test_square_cells_cover_area_once_and_assign_every_line(self):
+        from pyproj import CRS, Transformer
+        from shapely.geometry import Polygon
+        from shapely.ops import unary_union
+        center = {"latitude": 12.971598, "longitude": 77.594562}
+        telemetry = {**center, "connected": True, "gps_fix_type": "3D FIX",
+                     "last_position_timestamp": time.time(), "last_gps_timestamp": time.time()}
+        for extent, count in [(50, 4), (60, 9)]:
+            plan = build_radius_survey({"search_area": {"center": center, "radius_m": extent}}, telemetry).to_dict()
+            self.assertEqual(count, plan["cell_count"])
+            self.assertLessEqual(plan["cell_side_m"], 50)
+            crs = CRS.from_proj4("+proj=aeqd +lat_0=12.971598 +lon_0=77.594562 +datum=WGS84 +units=m")
+            projection = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
+            polygons = [Polygon([projection.transform(p["longitude"], p["latitude"]) for p in cell["boundary"]]) for cell in plan["cells"]]
+            self.assertAlmostEqual(sum(p.area for p in polygons), (2 * extent) ** 2, places=2)
+            self.assertAlmostEqual(unary_union(polygons).area, (2 * extent) ** 2, places=2)
+            assignments = [cell for drone in plan["swarm"]["drones"] for cell in drone["cell_ids"]]
+            self.assertEqual(list(range(1, count + 1)), sorted(assignments))
+            for cell in plan["cells"]:
+                tracks = [line for line in plan["survey_lines"] if line["cell_id"] == cell["cell_id"]]
+                self.assertEqual(cell["line_count"], len(tracks))
+                self.assertGreater(len(tracks), 1)
+                self.assertGreaterEqual(cell["coverage_percent"], 99.5)
+                for track in tracks:
+                    self.assertEqual(cell["drone_id"], track["drone_id"])
+                    self.assertIn(track["sortie_id"], cell["sortie_ids"])
+            for drone in plan["swarm"]["drones"]:
+                segments = drone["segments"]
+                self.assertEqual("takeoff", segments[0]["phase"])
+                self.assertEqual("landing", segments[-1]["phase"])
+                self.assertEqual(plan["home"], segments[-1]["end"])
+                for a, b in zip(segments, segments[1:]):
+                    self.assertEqual(a["end_s"], b["start_s"])
+                    self.assertEqual(a["end"], b["start"])
+            self.assertTrue(plan["swarm"]["simulation_only"])
+
+    def test_square_cell_limit_rejects_without_truncation(self):
+        with self.assertRaisesRegex(ValueError, "100 square cells"):
+            build_radius_survey({"search_area": {"center": {"latitude": 12, "longitude": 77}, "radius_m": 1000}}, {})
 
     def plan(self, payload):
         return build_auto_grid_mission(payload, {}).to_dict()

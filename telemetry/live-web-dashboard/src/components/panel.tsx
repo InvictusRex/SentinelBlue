@@ -12,7 +12,7 @@ type PanelProps = {
 export function Panel({ label, icon, meta, className = "", bodyClassName = "", children }: PanelProps) {
   return (
     <section className={`flex min-w-0 flex-col rounded-md border border-hud-line bg-hud-panel ${className}`}>
-      <header className="flex h-8 shrink-0 items-center gap-1.5 border-b border-hud-line px-2.5">
+      <header className="flex h-9 shrink-0 items-center gap-1.5 border-b border-hud-line px-2.5">
         {icon ? <span className="text-hud-faint">{icon}</span> : null}
         <h2 className="truncate text-2xs font-semibold uppercase tracking-[0.14em] text-hud-dim">
           {label}
@@ -35,7 +35,7 @@ export function Stat({ label, value, unit, tone = "text-hud-text" }: StatProps) 
   return (
     <div className="min-w-0">
       <div className="truncate text-2xs uppercase tracking-[0.1em] text-hud-faint">{label}</div>
-      <div className={`tabular truncate font-mono text-[13px] font-medium leading-5 ${tone}`}>
+      <div className={`tabular truncate font-mono text-sm font-medium ${tone}`}>
         {value}
         {unit ? <span className="ml-0.5 text-2xs text-hud-faint">{unit}</span> : null}
       </div>

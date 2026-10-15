@@ -20,14 +20,14 @@ export function TopBar({ live, onToggleLive, armed, mode, now, warnings }: TopBa
   const armedTone = armed === null ? "amber" : armed ? "red" : "neutral";
 
   return (
-    <header className="flex h-11 shrink-0 items-center gap-3 border-b border-hud-line bg-hud-panel px-3">
+    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-hud-line bg-hud-panel px-3">
       <div className="flex items-center gap-2">
         <span className="grid h-6 w-6 place-items-center rounded bg-sig-cyan/15 text-sig-cyan">
           <ActivityIcon size={13} />
         </span>
         <div className="leading-none">
-          <div className="font-mono text-[12px] font-semibold tracking-wide text-hud-text">{vehicle.name}</div>
-          <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-hud-faint">{vehicle.linkPath}</div>
+          <div className="font-mono text-sm font-semibold tracking-wide text-hud-text">{vehicle.name}</div>
+          <div className="mt-0.5 font-mono text-2xs uppercase tracking-[0.1em] text-hud-faint">{vehicle.linkPath}</div>
         </div>
       </div>
 
@@ -47,7 +47,7 @@ export function TopBar({ live, onToggleLive, armed, mode, now, warnings }: TopBa
       ) : null}
 
       <div className={`flex items-center gap-2 ${warnings.length > 0 ? "ml-auto md:ml-0" : "ml-auto"}`}>
-        <time className="tabular hidden font-mono text-[11px] text-hud-dim sm:block" dateTime={new Date(now).toISOString()}>{stamp(now)}</time>
+        <time className="tabular hidden font-mono text-2xs text-hud-dim sm:block" dateTime={new Date(now).toISOString()}>{stamp(now)}</time>
         <button
           type="button"
           onClick={onToggleLive}

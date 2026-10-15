@@ -1,14 +1,21 @@
 export interface Position { latitude: number; longitude: number }
 export type MissionItem = Record<string, number>;
+export interface SwarmSegment { start_s: number; end_s: number; start: Position; end: Position; phase: string; cell_id: number; sortie_id: number }
+export interface SwarmPosition extends Position { drone_id: number; cell_id: number; phase: string }
+export const droneColors = ["#2563eb", "#c026d3", "#15803d", "#ea580c", "#0891b2", "#7c3aed", "#be123c", "#854d0e"];
 export interface SurveyPlan {
-  search_area?: { center: Position; radius_m: number }; profile_name?: string; cruise_speed_m_s: number;
+  search_area?: { center: Position; radius_m: number; shape?: string; side_m?: number }; profile_name?: string; cruise_speed_m_s: number;
+  cell_count?: number; cell_side_m?: number; max_cell_side_m?: number;
+  cells?: { cell_id: number; boundary: Position[]; center: Position; drone_id: number; line_count: number; coverage_percent: number; sortie_ids: number[] }[];
+  swarm?: { simulation_only: boolean; drone_count: number; duration_s: number; warning: string;
+    drones: { drone_id: number; cell_ids: number[]; sortie_ids: number[]; duration_s: number; segments: SwarmSegment[] }[] };
   plan_id: string; schema_version: number; home: Position; boundary: Position[];
   altitude_m: number; area_m2: number; coverage_percent: number; grid_angle_deg: number;
   sortie_budget_minutes: number;
   camera: { cross_track_m: number; along_track_m: number; line_spacing_m: number;
     trigger_distance_m: number; trigger_interval_s: number; gsd_width_cm: number; gsd_height_cm: number };
-  survey_lines: { sortie_id: number; start_latitude: number; start_longitude: number; end_latitude: number; end_longitude: number }[];
-  sorties: { sortie_id: number; line_count: number; route: Position[]; distance_m: number;
+  survey_lines: { cell_id?: number; drone_id?: number; sortie_id: number; start_latitude: number; start_longitude: number; end_latitude: number; end_longitude: number }[];
+  sorties: { cell_id?: number; drone_id?: number; scheduled_end_s?: number; sortie_id: number; line_count: number; route: Position[]; distance_m: number;
     estimated_minutes: number; estimated_photos: number; outside_boundary_m: number;
     mission_item_count: number; ready: boolean; blocking_reasons: string[]; mission_items: MissionItem[] }[];
   estimate: { survey_line_count: number; total_distance_m: number; estimated_minutes: number;
@@ -17,15 +24,27 @@ export interface SurveyPlan {
 }
 
 // Display preview only. The Pi computes the authoritative geodesic boundary.
-export function radiusPreview(center: Position | null, radius: number): Position[] {
+export function squarePreview(center: Position | null, radius: number): Position[] {
   if (!center || !Number.isFinite(radius) || radius < 2 || radius > 10000) return [];
   const lat = center.latitude * Math.PI / 180, lon = center.longitude * Math.PI / 180;
-  const distance = radius / 6371008.8;
-  return Array.from({ length: 64 }, (_, index) => {
-    const bearing = index * 2 * Math.PI / 64;
+  const distance = Math.SQRT2 * radius / 6371008.8;
+  return [225, 135, 45, 315].map(degrees => {
+    const bearing = degrees * Math.PI / 180;
     const latitude = Math.asin(Math.sin(lat) * Math.cos(distance) + Math.cos(lat) * Math.sin(distance) * Math.cos(bearing));
     const longitude = lon + Math.atan2(Math.sin(bearing) * Math.sin(distance) * Math.cos(lat), Math.cos(distance) - Math.sin(lat) * Math.sin(latitude));
     return { latitude: latitude * 180 / Math.PI, longitude: ((longitude * 180 / Math.PI + 540) % 360) - 180 };
+  });
+}
+
+export function swarmPositions(swarm: SurveyPlan["swarm"], elapsed: number): SwarmPosition[] {
+  return (swarm?.drones ?? []).flatMap(drone => {
+    const segments = drone.segments;
+    const segment = segments.find(item => elapsed < item.end_s) ?? segments[segments.length - 1];
+    if (!segment) return [];
+    const progress = Math.max(0, Math.min(1, (elapsed - segment.start_s) / Math.max(.001, segment.end_s - segment.start_s)));
+    return [{ drone_id: drone.drone_id, cell_id: segment.cell_id, phase: elapsed >= drone.duration_s ? "complete" : segment.phase,
+      latitude: segment.start.latitude + (segment.end.latitude - segment.start.latitude) * progress,
+      longitude: segment.start.longitude + (segment.end.longitude - segment.start.longitude) * progress }];
   });
 }
 

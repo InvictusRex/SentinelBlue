@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Map, Marker, LngLatBounds, NavigationControl, setWorkerUrl, type GeoJSONSource, type StyleSpecification } from "maplibre-gl";
 import mapLibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
-import type { Position, SurveyPlan } from "../lib/survey_plan";
+import { droneColors, type Position, type SurveyPlan, type SwarmPosition } from "../lib/survey_plan";
 
 setWorkerUrl(mapLibreWorkerUrl);
 export type DrawMode = "navigate" | "rectangle" | "polygon" | "home" | "center";
 interface Props {
   boundary: Position[]; home: Position | null; plan: SurveyPlan | null; sortie: number;
   center?: Position | null;
+  swarmPositions?: SwarmPosition[];
   mode: DrawMode; focus: Position; fitVersion: number;
   onClick: (point: Position) => void; onMoveVertex: (index: number, point: Position) => void;
 }
@@ -28,6 +29,7 @@ export function TerrainMissionMap(props: Props) {
   const { boundary, home, plan, sortie, mode, center } = props;
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
+  const swarmMarkers = useRef<Record<number, Marker>>({});
   const current = useRef(props); current.current = props;
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
@@ -35,6 +37,7 @@ export function TerrainMissionMap(props: Props) {
     if (!container.current) return;
     setLoaded(false);
     setError(false);
+    Object.values(swarmMarkers.current).forEach(marker => marker.remove()); swarmMarkers.current = {};
     const map = new Map({ container: container.current, style: mapStyle(), center: coordinates(current.current.focus), zoom: 17, maxPitch: 0 });
     mapRef.current = map;
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
@@ -42,11 +45,13 @@ export function TerrainMissionMap(props: Props) {
     map.on("click", event => current.current.onClick({ latitude: event.lngLat.lat, longitude: event.lngLat.lng }));
     map.on("error", () => setError(true));
     map.on("style.load", () => {
-      for (const source of ["area", "edge", "grid", "transit"]) map.addSource(source, { type: "geojson", data: collection([]) });
+      for (const source of ["area", "cells", "edge", "grid", "transit"]) map.addSource(source, { type: "geojson", data: collection([]) });
       map.addLayer({ id: "area", type: "fill", source: "area", paint: { "fill-color": "#2dd4bf", "fill-opacity": 0.14 } });
+      map.addLayer({ id: "cell_fill", type: "fill", source: "cells", paint: { "fill-color": ["get", "color"], "fill-opacity": 0.12 } });
+      map.addLayer({ id: "cell_edge", type: "line", source: "cells", paint: { "line-color": ["get", "color"], "line-width": 2 } });
       map.addLayer({ id: "edge", type: "line", source: "edge", paint: { "line-color": "#0d9488", "line-width": 3 } });
       map.addLayer({ id: "transit", type: "line", source: "transit", paint: { "line-color": "#2563eb", "line-width": 2, "line-dasharray": [3, 3] } });
-      map.addLayer({ id: "grid", type: "line", source: "grid", paint: { "line-color": ["case", ["get", "active"], "#b45309", "#64748b"], "line-width": ["case", ["get", "active"], 3, 1], "line-opacity": ["case", ["get", "active"], 1, 0.4] } });
+      map.addLayer({ id: "grid", type: "line", source: "grid", paint: { "line-color": ["case", ["get", "active"], "#b45309", ["get", "color"]], "line-width": ["case", ["get", "active"], 3, 1.5], "line-opacity": ["case", ["get", "active"], 1, 0.8] } });
       setLoaded(true);
     });
     const observer = new ResizeObserver(() => map.resize()); observer.observe(container.current);
@@ -58,9 +63,10 @@ export function TerrainMissionMap(props: Props) {
     const closed = boundary.length >= 3 ? [...boundary, boundary[0]] : boundary;
     (map.getSource("area") as GeoJSONSource).setData(collection(boundary.length >= 3 ? [{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [closed.map(coordinates)] } }] : []));
     (map.getSource("edge") as GeoJSONSource).setData(collection(boundary.length >= 2 ? [line(closed)] : []));
+    (map.getSource("cells") as GeoJSONSource).setData(collection((plan?.cells ?? []).map(cell => ({ type: "Feature", properties: { color: droneColors[(cell.drone_id - 1) % droneColors.length] }, geometry: { type: "Polygon", coordinates: [[...cell.boundary, cell.boundary[0]].map(coordinates)] } }))));
     (map.getSource("grid") as GeoJSONSource).setData(collection((plan?.survey_lines ?? []).map(track => line([
       { latitude: track.start_latitude, longitude: track.start_longitude }, { latitude: track.end_latitude, longitude: track.end_longitude }
-    ], { active: track.sortie_id === sortie }))));
+    ], { active: track.sortie_id === sortie, color: droneColors[((track.drone_id ?? 1) - 1) % droneColors.length] }))));
     const selected = plan?.sorties.find(item => item.sortie_id === sortie);
     const transits = selected ? selected.route.flatMap((point, index, route) => index % 2 === 0 && index + 1 < route.length ? [line([point, route[index + 1]])] : []) : [];
     (map.getSource("transit") as GeoJSONSource).setData(collection(transits));
@@ -72,6 +78,14 @@ export function TerrainMissionMap(props: Props) {
       marker.on("dragend", () => { const p = marker.getLngLat(); current.current.onMoveVertex(index, { latitude: p.lat, longitude: p.lng }); });
       return marker;
     });
+    for (const cell of plan?.cells ?? []) {
+      const element = document.createElement("span"); element.className = "survey-vertex";
+      element.style.width = "70px"; element.style.borderRadius = "4px";
+      element.style.background = droneColors[(cell.drone_id - 1) % droneColors.length];
+      element.textContent = `C${cell.cell_id} · D${cell.drone_id}`;
+      element.title = `Cell ${cell.cell_id}, virtual drone ${cell.drone_id}, ${cell.line_count} survey lines`;
+      markers.push(new Marker({ element }).setLngLat(coordinates(cell.center)).addTo(map));
+    }
     for (const [point, label, color] of [[center, "C", "#0f766e"], [home ?? plan?.home, "H", "#2563eb"], [selected?.route[1], "S", "#15803d"], [selected ? selected.route[selected.route.length - 2] : undefined, "E", "#b45309"]] as const) {
       if (!point) continue;
       const element = document.createElement("span"); element.className = "survey-vertex";
@@ -80,6 +94,23 @@ export function TerrainMissionMap(props: Props) {
     }
     return () => markers.forEach(marker => marker.remove());
   }, [boundary, home, plan, sortie, mode, center, loaded]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+    const positions = props.swarmPositions ?? [];
+    for (const [key, marker] of Object.entries(swarmMarkers.current)) {
+      if (!positions.some(point => point.drone_id === Number(key))) { marker.remove(); delete swarmMarkers.current[Number(key)]; }
+    }
+    for (const point of positions) {
+      if (!swarmMarkers.current[point.drone_id]) {
+        const element = document.createElement("span"); element.className = "survey-vertex";
+        element.style.width = "36px"; element.style.height = "36px"; element.style.zIndex = "5";
+        element.style.background = droneColors[(point.drone_id - 1) % droneColors.length]; element.textContent = `D${point.drone_id}`;
+        swarmMarkers.current[point.drone_id] = new Marker({ element }).setLngLat(coordinates(point)).addTo(map);
+      }
+      swarmMarkers.current[point.drone_id].setLngLat(coordinates(point));
+    }
+  }, [props.swarmPositions, loaded]);
   useEffect(() => {
     const map = mapRef.current;
     if (map) map.getCanvas().style.cursor = props.mode === "navigate" ? "" : "crosshair";

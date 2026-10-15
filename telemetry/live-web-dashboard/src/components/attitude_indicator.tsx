@@ -10,7 +10,7 @@ export function AttitudeIndicator({ attitude, available, className }: { attitude
 
   return (
     <Panel
-      label="Attitude · Heading"
+      label="Altitude · Heading"
       icon={<CompassIcon size={12} />}
       meta={<Chip tone={available ? "cyan" : "amber"}>{available ? "AHRS LOCK" : "NO DATA"}</Chip>}
       className={className}
@@ -37,7 +37,7 @@ export function AttitudeIndicator({ attitude, available, className }: { attitude
               <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: r.color }} aria-hidden="true" />
               {r.label}
             </dt>
-            <dd className="tabular font-mono text-[13px] font-medium leading-4 text-hud-text">{available ? `${r.value.toFixed(1)}°` : "--"}</dd>
+            <dd className="tabular font-mono text-sm font-medium text-hud-text">{available ? `${r.value.toFixed(1)}°` : "--"}</dd>
           </div>
         ))}
       </dl>

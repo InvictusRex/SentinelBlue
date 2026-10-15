@@ -25,10 +25,10 @@ export function TelemetryChart({ data, series, domain = ["auto", "auto"], ticks,
           ticks={ticks}
           interval={0}
           allowDataOverflow
-          width={34}
+          width={44}
           tickLine={false}
           axisLine={false}
-          tick={{ fill: "#ffffff", fontSize: 9, fontFamily: "JetBrains Mono" }}
+          tick={{ fill: "#ffffff", fontSize: 12, fontFamily: "JetBrains Mono" }}
           tickFormatter={(v: number) => `${v}${unit ?? ""}`}
         />
         {series.map((s) => (

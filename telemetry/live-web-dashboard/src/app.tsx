@@ -1,12 +1,11 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { GaugeIcon, MapPinnedIcon, PlugZapIcon, SlidersHorizontalIcon, WavesIcon, WifiIcon } from "lucide-react";
+import { GaugeIcon, PlugZapIcon, SlidersHorizontalIcon, WavesIcon, WifiIcon } from "lucide-react";
 import { AltitudeCard } from "./components/altitude_card";
 import { AttitudeIndicator } from "./components/attitude_indicator";
 import { BatteryBox } from "./components/battery_box";
 import { FlightStatusCard } from "./components/flight_status_card";
 import { LinkCard } from "./components/link_card";
 import { NavSignalBox } from "./components/nav_signal_box";
-import { MissionPlanner } from "./components/mission_planner";
 import { SbcStatusCard } from "./components/sbc_status_card";
 import { TopBar } from "./components/top_bar";
 import { gyroSeries, motorSeries, pidSeries, vehicle } from "./data/telemetry";
@@ -57,8 +56,7 @@ function ConnectionPanel({
   error,
   onChange,
   onCellCountChange,
-  onSubmit,
-  onOpenMission
+  onSubmit
 }: {
   value: string;
   cellCount: number;
@@ -66,31 +64,30 @@ function ConnectionPanel({
   onChange: (value: string) => void;
   onCellCountChange: (value: number) => void;
   onSubmit: () => void;
-  onOpenMission: () => void;
 }) {
   return (
     <div className="hud-grid-bg flex min-h-full w-full items-center justify-center bg-hud-bg p-4 font-sans text-hud-text">
       <form
-        className="w-full max-w-[440px] rounded border border-hud-line bg-hud-panel p-4 shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
+        className="w-full max-w-[800px] rounded border border-hud-line bg-hud-panel p-6 shadow-[0_18px_60px_rgba(0,0,0,0.35)] sm:p-10"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit();
         }}
       >
-        <div className="mb-4 flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-teal-400/30 bg-teal-400/10 text-white">
-            <WifiIcon size={18} />
+        <div className="mb-10 flex items-center gap-5">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded border border-teal-400/30 bg-teal-400/10 text-white">
+            <WifiIcon size={27} />
           </span>
           <div className="min-w-0">
-            <h1 className="text-sm font-semibold uppercase tracking-[0.08em] text-hud-text">Connect ESP32 Telemetry</h1>
-            <p className="mt-1 text-xs leading-5 text-hud-muted">Enter the ESP32 address or a secure telemetry URL.</p>
+            <h1 className="text-2xl font-semibold text-hud-text">Connect ESP32 Telemetry</h1>
+            <p className="mt-2 text-base leading-7 text-hud-muted">Enter the ESP32 address or a secure telemetry URL.</p>
           </div>
         </div>
 
-        <label className="mb-2 block font-mono text-2xs uppercase tracking-[0.12em] text-hud-faint" htmlFor="esp-ip">
+        <label className="mb-3 block font-mono text-base font-semibold text-hud-faint" htmlFor="esp-ip">
           ESP32 IP or telemetry URL
         </label>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <input
             id="esp-ip"
             autoFocus
@@ -101,40 +98,31 @@ function ConnectionPanel({
             inputMode="url"
             onChange={(event) => onChange(event.target.value)}
             placeholder="10.160.142.17 or https://telemetry.example/api"
-            className="h-10 min-w-0 flex-1 rounded border border-hud-line bg-hud-bg px-3 font-mono text-sm tabular text-hud-text outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-300/20"
+            className="h-14 min-w-0 flex-1 rounded border border-hud-line bg-hud-bg px-4 font-mono text-lg tabular text-hud-text outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-300/20"
           />
           <button
             type="submit"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded border border-teal-300/40 bg-teal-300/15 px-4 font-mono text-2xs font-semibold uppercase tracking-[0.12em] text-white transition hover:border-teal-200 hover:bg-teal-300/20 focus:outline-none focus:ring-2 focus:ring-teal-300/30"
+            className="inline-flex h-14 items-center justify-center gap-2 rounded border border-teal-300/40 bg-teal-300/15 px-6 font-mono text-base font-semibold text-white transition hover:border-teal-200 hover:bg-teal-300/20 focus:outline-none focus:ring-2 focus:ring-teal-300/30"
           >
             <PlugZapIcon size={14} />
             Connect
           </button>
         </div>
 
-        <label className="mt-3 flex items-center justify-between gap-3 font-mono text-xs uppercase tracking-[0.08em] text-hud-faint">
+        <label className="mt-8 flex items-center justify-between gap-3 font-mono text-base font-semibold text-hud-faint">
           Battery cells
           <select
             value={cellCount}
             onChange={(event) => onCellCountChange(Number(event.target.value))}
-            className="h-9 rounded border border-hud-line bg-hud-bg px-3 text-sm text-hud-text outline-none focus:border-teal-300 focus:ring-2 focus:ring-teal-300/20"
+            className="h-12 rounded border border-hud-line bg-hud-bg px-3 text-lg text-hud-text outline-none focus:border-teal-300 focus:ring-2 focus:ring-teal-300/20"
           >
             {[2, 3, 4, 5, 6].map((count) => <option key={count} value={count}>{count}S</option>)}
           </select>
         </label>
 
-        {error ? <p className="mt-3 font-mono text-2xs uppercase tracking-[0.08em] text-sig-red" role="alert">{error}</p> : null}
+        {error ? <p className="mt-4 font-mono text-base text-sig-red" role="alert">{error}</p> : null}
 
-        <button
-          type="button"
-          onClick={onOpenMission}
-          className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-hud-line bg-white/[0.03] px-4 text-sm font-semibold text-hud-text transition hover:border-teal-300/50 hover:bg-teal-300/10 focus:outline-none focus:ring-2 focus:ring-teal-300/30"
-        >
-          <MapPinnedIcon size={16} />
-          Open mission planner
-        </button>
-
-        <div className="mt-4 rounded border border-hud-line bg-hud-bg/70 p-3 font-mono text-2xs leading-5 text-hud-muted">
+        <div className="mt-10 rounded border border-hud-line bg-hud-bg/70 p-5 font-mono text-base leading-7 text-hud-muted">
           <div>Example: 10.160.142.17</div>
           <div>Local: http://&lt;esp-ip&gt;/telemetry.json</div>
           <div>Hosted dashboard: use a complete HTTPS endpoint.</div>
@@ -144,11 +132,6 @@ function ConnectionPanel({
   );
 }
 
-function initialView(): "telemetry" | "mission" {
-  const query = new URLSearchParams(window.location.search);
-  return query.get("view") === "mission" || query.get("preview") === "mission" ? "mission" : "telemetry";
-}
-
 export function App({ streaming = true }: { streaming?: boolean }) {
   const [live, setLive] = useState(streaming);
   const [espInput, setEspInput] = useState(initialEspInput);
@@ -156,7 +139,6 @@ export function App({ streaming = true }: { streaming?: boolean }) {
   const [endpoint, setEndpoint] = useState("");
   const [connectError, setConnectError] = useState("");
   const [now, setNow] = useState(Date.now());
-  const [view, setView] = useState<"telemetry" | "mission">(initialView);
   const t = useTelemetry(live, endpoint, cellCount);
   const warnings = activeWarnings(t);
   const hasTelemetry = t.source.lastUpdated > 0;
@@ -183,16 +165,7 @@ export function App({ streaming = true }: { streaming?: boolean }) {
     }
   };
 
-  const changeView = (nextView: "telemetry" | "mission") => {
-    setView(nextView);
-    const url = new URL(window.location.href);
-    url.searchParams.delete("preview");
-    if (nextView === "mission") url.searchParams.set("view", "mission");
-    else url.searchParams.delete("view");
-    window.history.replaceState(null, "", url);
-  };
-
-  if (endpoint.length === 0 && view === "telemetry") {
+  if (endpoint.length === 0) {
     return (
       <ConnectionPanel
         value={espInput}
@@ -201,7 +174,6 @@ export function App({ streaming = true }: { streaming?: boolean }) {
         onChange={setEspInput}
         onCellCountChange={setCellCount}
         onSubmit={connect}
-        onOpenMission={() => changeView("mission")}
       />
     );
   }
@@ -216,19 +188,6 @@ export function App({ streaming = true }: { streaming?: boolean }) {
         now={now}
         warnings={warnings}
       />
-
-      <nav className="flex gap-1 border-b border-hud-line bg-hud-panel px-3 py-2" aria-label="Dashboard views">
-        <button type="button" onClick={() => changeView("telemetry")} className={`rounded px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-teal-300/30 ${view === "telemetry" ? "bg-teal-300 text-[#04110f]" : "text-hud-muted hover:bg-white/5 hover:text-white"}`}>Telemetry</button>
-        <button type="button" onClick={() => changeView("mission")} className={`rounded px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-teal-300/30 ${view === "mission" ? "bg-teal-300 text-[#04110f]" : "text-hud-muted hover:bg-white/5 hover:text-white"}`}>Mission planner</button>
-      </nav>
-
-      {view === "mission" ? (
-        <MissionPlanner
-          currentLatitude={t.nav.lat}
-          currentLongitude={t.nav.lon}
-          telemetryAvailable={hasTelemetry}
-        />
-      ) : (
 
       <main className="flex flex-1 flex-col gap-2 p-2.5 xl:min-h-0">
         {warnings.length > 0 ? (
@@ -346,7 +305,6 @@ export function App({ streaming = true }: { streaming?: boolean }) {
           </button>
         </footer>
       </main>
-      )}
     </div>
   );
 }

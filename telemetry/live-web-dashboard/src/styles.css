@@ -2,6 +2,22 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../../../autonomous-grid-search/web/src/assets/JetBrainsMono-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../../../autonomous-grid-search/web/src/assets/JetBrainsMono-SemiBold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+}
+
 html,
 body,
 #root {
@@ -11,6 +27,7 @@ body,
 
 body {
   margin: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
   background-color: #080b10;
   color: #ffffff;
   -webkit-font-smoothing: antialiased;
