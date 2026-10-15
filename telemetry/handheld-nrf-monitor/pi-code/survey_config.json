@@ -1,0 +1,26 @@
+{
+  "profile_name": "downward_water_camera",
+  "altitude_m": 5,
+  "cruise_speed_m_s": 2,
+  "camera_horizontal_fov_deg": 78,
+  "camera_vertical_fov_deg": 60,
+  "side_overlap_percent": 70,
+  "forward_overlap_percent": 75,
+  "surface_type": "water",
+  "terrain_enabled": false,
+  "survey_options": {
+    "camera_model": "fov",
+    "camera_orientation": "landscape",
+    "image_width_px": 4000,
+    "image_height_px": 3000,
+    "minimum_trigger_interval_s": 0.5,
+    "spacing_mode": "camera",
+    "angle_mode": "auto",
+    "entry": "nearest",
+    "pattern": "single",
+    "overshoot_m": 0,
+    "endurance_minutes": 20,
+    "reserve_percent": 20,
+    "turn_seconds": 3
+  }
+}

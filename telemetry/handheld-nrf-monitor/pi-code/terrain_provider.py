@@ -17,6 +17,7 @@ def sample_plan_terrain(plan, surface_type: str = "water") -> Dict[str, Any]:
         (plan.center_latitude, plan.center_longitude),
     ]
     points.extend((cell.center_latitude, cell.center_longitude) for cell in plan.cells)
+    points.extend((point["latitude"], point["longitude"]) for point in plan.to_dict().get("boundary", []))
     result = sample_elevations(points)
     result["surface_type"] = surface_type
     result["used_for_clearance"] = False

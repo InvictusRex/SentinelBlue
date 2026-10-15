@@ -1,247 +1,103 @@
-import { useEffect, useRef } from "react";
-import {
-  LngLatBounds,
-  Map,
-  NavigationControl,
-  setWorkerUrl,
-  type GeoJSONSource,
-  type MapMouseEvent,
-  type StyleSpecification
-} from "maplibre-gl";
+import { useEffect, useRef, useState } from "react";
+import { Map, Marker, LngLatBounds, NavigationControl, setWorkerUrl, type GeoJSONSource, type StyleSpecification } from "maplibre-gl";
 import mapLibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
+import type { Position, SurveyPlan } from "../lib/survey_plan";
 
 setWorkerUrl(mapLibreWorkerUrl);
-
-interface MapCell {
-  cell_id: number;
-  north_m: number;
-  east_m: number;
-  south_m: number;
-  west_m: number;
+export type DrawMode = "navigate" | "rectangle" | "polygon" | "home" | "center";
+interface Props {
+  boundary: Position[]; home: Position | null; plan: SurveyPlan | null; sortie: number;
+  center?: Position | null;
+  mode: DrawMode; focus: Position; fitVersion: number;
+  onClick: (point: Position) => void; onMoveVertex: (index: number, point: Position) => void;
 }
-
-interface MapSurveyLine {
-  cell_id: number;
-  start_latitude: number;
-  start_longitude: number;
-  end_latitude: number;
-  end_longitude: number;
-}
-
-interface MapPlan {
-  center: { latitude: number; longitude: number };
-  home: { latitude: number; longitude: number };
-  radius_km: number;
-  cells: MapCell[];
-  survey_lines: MapSurveyLine[];
-}
-
-const emptyCollection: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
+const coordinates = (point: Position): [number, number] => [point.longitude, point.latitude];
+const collection = (features: GeoJSON.Feature[]): GeoJSON.FeatureCollection => ({ type: "FeatureCollection", features });
+const line = (points: Position[], properties = {}): GeoJSON.Feature => ({ type: "Feature", properties, geometry: { type: "LineString", coordinates: points.map(coordinates) } });
 
 function mapStyle(): StyleSpecification | string {
-  const mapTilerKey = (import.meta as ImportMeta & {
-    env?: Record<string, string | undefined>;
-  }).env?.VITE_MAPTILER_KEY;
-  if (mapTilerKey) {
-    return `https://api.maptiler.com/maps/hybrid/style.json?key=${encodeURIComponent(mapTilerKey)}`;
-  }
-  return {
-    version: 8,
-    sources: {
-      open_street_map: {
-        type: "raster",
-        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-        tileSize: 256,
-        attribution: "© OpenStreetMap contributors"
-      },
-      terrain_dem: {
-        type: "raster-dem",
-        url: "https://demotiles.maplibre.org/terrain-tiles/tiles.json",
-        tileSize: 256
-      },
-      terrain_hillshade_dem: {
-        type: "raster-dem",
-        url: "https://demotiles.maplibre.org/terrain-tiles/tiles.json",
-        tileSize: 256
-      }
-    },
-    layers: [
-      { id: "open_street_map", type: "raster", source: "open_street_map" },
-      {
-        id: "terrain_hillshade",
-        type: "hillshade",
-        source: "terrain_hillshade_dem",
-        paint: {
-          "hillshade-exaggeration": 0.35,
-          "hillshade-shadow-color": "#071014",
-          "hillshade-highlight-color": "#d7fff8",
-          "hillshade-accent-color": "#0f766e"
-        }
-      }
-    ]
-  };
+  const key = (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_MAPTILER_KEY;
+  if (key) return `https://api.maptiler.com/maps/hybrid/style.json?key=${encodeURIComponent(key)}`;
+  return { version: 8, sources: {
+    tiles: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 19, attribution: "© OpenStreetMap contributors" },
+    dem: { type: "raster-dem", url: "https://demotiles.maplibre.org/terrain-tiles/tiles.json", tileSize: 256 }
+  }, layers: [{ id: "tiles", type: "raster", source: "tiles" }, { id: "terrain", type: "hillshade", source: "dem", paint: { "hillshade-exaggeration": 0.25 } }] };
 }
 
-function offsetCoordinate(latitude: number, longitude: number, northM: number, eastM: number): [number, number] {
-  const nextLatitude = latitude + northM / 111_320;
-  const longitudeScale = 111_320 * Math.max(0.01, Math.cos(latitude * Math.PI / 180));
-  return [longitude + eastM / longitudeScale, nextLatitude];
-}
-
-function planGeometry(plan: MapPlan | null, selected: { latitude: number; longitude: number } | null) {
-  const areas: GeoJSON.Feature[] = [];
-  const lines: GeoJSON.Feature[] = [];
-  const points: GeoJSON.Feature[] = [];
-
-  if (plan) {
-    for (const cell of plan.cells) {
-      const northWest = offsetCoordinate(plan.center.latitude, plan.center.longitude, cell.north_m, cell.west_m);
-      const northEast = offsetCoordinate(plan.center.latitude, plan.center.longitude, cell.north_m, cell.east_m);
-      const southEast = offsetCoordinate(plan.center.latitude, plan.center.longitude, cell.south_m, cell.east_m);
-      const southWest = offsetCoordinate(plan.center.latitude, plan.center.longitude, cell.south_m, cell.west_m);
-      areas.push({
-        type: "Feature",
-        properties: { cell_id: cell.cell_id },
-        geometry: { type: "Polygon", coordinates: [[northWest, northEast, southEast, southWest, northWest]] }
-      });
-    }
-    for (const line of plan.survey_lines) {
-      lines.push({
-        type: "Feature",
-        properties: { cell_id: line.cell_id },
-        geometry: {
-          type: "LineString",
-          coordinates: [
-            [line.start_longitude, line.start_latitude],
-            [line.end_longitude, line.end_latitude]
-          ]
-        }
-      });
-    }
-    points.push({
-      type: "Feature",
-      properties: { kind: "home" },
-      geometry: { type: "Point", coordinates: [plan.home.longitude, plan.home.latitude] }
-    });
-  }
-  if (selected) {
-    points.push({
-      type: "Feature",
-      properties: { kind: "center" },
-      geometry: { type: "Point", coordinates: [selected.longitude, selected.latitude] }
-    });
-  }
-  return {
-    areas: { type: "FeatureCollection", features: areas } as GeoJSON.FeatureCollection,
-    lines: { type: "FeatureCollection", features: lines } as GeoJSON.FeatureCollection,
-    points: { type: "FeatureCollection", features: points } as GeoJSON.FeatureCollection
-  };
-}
-
-function addMissionLayers(map: Map) {
-  if (map.getSource("mission_cells")) return;
-  map.addSource("mission_cells", { type: "geojson", data: emptyCollection });
-  map.addSource("mission_lines", { type: "geojson", data: emptyCollection });
-  map.addSource("mission_points", { type: "geojson", data: emptyCollection });
-  map.addLayer({
-    id: "mission_cell_fill",
-    type: "fill",
-    source: "mission_cells",
-    paint: { "fill-color": "#2dd4bf", "fill-opacity": 0.10 }
-  });
-  map.addLayer({
-    id: "mission_cell_outline",
-    type: "line",
-    source: "mission_cells",
-    paint: { "line-color": "#5eead4", "line-width": 2 }
-  });
-  map.addLayer({
-    id: "mission_survey_lines",
-    type: "line",
-    source: "mission_lines",
-    paint: { "line-color": "#fbbf24", "line-width": 2, "line-opacity": 0.9 }
-  });
-  map.addLayer({
-    id: "mission_home",
-    type: "circle",
-    source: "mission_points",
-    filter: ["==", ["get", "kind"], "home"],
-    paint: { "circle-radius": 7, "circle-color": "#60a5fa", "circle-stroke-color": "#071014", "circle-stroke-width": 2 }
-  });
-  map.addLayer({
-    id: "mission_center",
-    type: "circle",
-    source: "mission_points",
-    filter: ["==", ["get", "kind"], "center"],
-    paint: { "circle-radius": 7, "circle-color": "#5eead4", "circle-stroke-color": "#071014", "circle-stroke-width": 2 }
-  });
-}
-
-export function TerrainMissionMap({
-  selected,
-  plan,
-  onSelect
-}: {
-  selected: { latitude: number; longitude: number } | null;
-  plan: MapPlan | null;
-  onSelect: (latitude: number, longitude: number) => void;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
+export function TerrainMissionMap(props: Props) {
+  const { boundary, home, plan, sortie, mode, center } = props;
+  const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
-  const onSelectRef = useRef(onSelect);
-  const initialSelectedRef = useRef(selected);
-  onSelectRef.current = onSelect;
-
+  const current = useRef(props); current.current = props;
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
-    const initialSelected = initialSelectedRef.current;
-    const initialCenter: [number, number] = initialSelected
-      ? [initialSelected.longitude, initialSelected.latitude]
-      : [0, 20];
-    const map = new Map({
-      container: containerRef.current,
-      style: mapStyle(),
-      center: initialCenter,
-      zoom: initialSelected ? 13 : 1.5,
-      attributionControl: {},
-      maxPitch: 70
-    });
-    map.addControl(new NavigationControl({ visualizePitch: true }), "top-right");
-    map.on("click", (event: MapMouseEvent) => onSelectRef.current(event.lngLat.lat, event.lngLat.lng));
-    map.on("style.load", () => {
-      addMissionLayers(map);
-      if (map.getSource("terrain_dem")) map.setTerrain({ source: "terrain_dem", exaggeration: 1.25 });
-    });
+    if (!container.current) return;
+    setLoaded(false);
+    setError(false);
+    const map = new Map({ container: container.current, style: mapStyle(), center: coordinates(current.current.focus), zoom: 17, maxPitch: 0 });
     mapRef.current = map;
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
+    map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    map.doubleClickZoom.disable();
+    map.on("click", event => current.current.onClick({ latitude: event.lngLat.lat, longitude: event.lngLat.lng }));
+    map.on("error", () => setError(true));
+    map.on("style.load", () => {
+      for (const source of ["area", "edge", "grid", "transit"]) map.addSource(source, { type: "geojson", data: collection([]) });
+      map.addLayer({ id: "area", type: "fill", source: "area", paint: { "fill-color": "#2dd4bf", "fill-opacity": 0.14 } });
+      map.addLayer({ id: "edge", type: "line", source: "edge", paint: { "line-color": "#0d9488", "line-width": 3 } });
+      map.addLayer({ id: "transit", type: "line", source: "transit", paint: { "line-color": "#2563eb", "line-width": 2, "line-dasharray": [3, 3] } });
+      map.addLayer({ id: "grid", type: "line", source: "grid", paint: { "line-color": ["case", ["get", "active"], "#b45309", "#64748b"], "line-width": ["case", ["get", "active"], 3, 1], "line-opacity": ["case", ["get", "active"], 1, 0.4] } });
+      setLoaded(true);
+    });
+    const observer = new ResizeObserver(() => map.resize()); observer.observe(container.current);
+    return () => { observer.disconnect(); map.remove(); mapRef.current = null; };
   }, []);
-
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!loaded || !map || !map.getSource("area")) return;
+    const closed = boundary.length >= 3 ? [...boundary, boundary[0]] : boundary;
+    (map.getSource("area") as GeoJSONSource).setData(collection(boundary.length >= 3 ? [{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [closed.map(coordinates)] } }] : []));
+    (map.getSource("edge") as GeoJSONSource).setData(collection(boundary.length >= 2 ? [line(closed)] : []));
+    (map.getSource("grid") as GeoJSONSource).setData(collection((plan?.survey_lines ?? []).map(track => line([
+      { latitude: track.start_latitude, longitude: track.start_longitude }, { latitude: track.end_latitude, longitude: track.end_longitude }
+    ], { active: track.sortie_id === sortie }))));
+    const selected = plan?.sorties.find(item => item.sortie_id === sortie);
+    const transits = selected ? selected.route.flatMap((point, index, route) => index % 2 === 0 && index + 1 < route.length ? [line([point, route[index + 1]])] : []) : [];
+    (map.getSource("transit") as GeoJSONSource).setData(collection(transits));
+    const markers = (mode === "center" ? [] : boundary).map((point, index) => {
+      const element = document.createElement("button"); element.type = "button"; element.textContent = String(index + 1);
+      element.className = "survey-vertex"; element.setAttribute("aria-label", `Boundary vertex ${index + 1}; drag to move. Coordinates can also be edited in Area.`);
+      element.addEventListener("click", event => event.stopPropagation());
+      const marker = new Marker({ element, draggable: mode === "navigate" }).setLngLat(coordinates(point)).addTo(map);
+      marker.on("dragend", () => { const p = marker.getLngLat(); current.current.onMoveVertex(index, { latitude: p.lat, longitude: p.lng }); });
+      return marker;
+    });
+    for (const [point, label, color] of [[center, "C", "#0f766e"], [home ?? plan?.home, "H", "#2563eb"], [selected?.route[1], "S", "#15803d"], [selected ? selected.route[selected.route.length - 2] : undefined, "E", "#b45309"]] as const) {
+      if (!point) continue;
+      const element = document.createElement("span"); element.className = "survey-vertex";
+      element.style.background = color; element.textContent = label; element.title = label === "C" ? "Search centre" : label === "H" ? "Launch and landing" : label === "S" ? "First survey line" : "Last survey line";
+      markers.push(new Marker({ element }).setLngLat(coordinates(point)).addTo(map));
+    }
+    return () => markers.forEach(marker => marker.remove());
+  }, [boundary, home, plan, sortie, mode, center, loaded]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map) map.getCanvas().style.cursor = props.mode === "navigate" ? "" : "crosshair";
+  }, [props.mode]);
+  useEffect(() => {
+    mapRef.current?.easeTo({ center: coordinates(props.focus), zoom: 17, duration: 300 });
+  }, [props.focus]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const geometry = planGeometry(plan, selected);
-    const update = () => {
-      addMissionLayers(map);
-      (map.getSource("mission_cells") as GeoJSONSource | undefined)?.setData(geometry.areas);
-      (map.getSource("mission_lines") as GeoJSONSource | undefined)?.setData(geometry.lines);
-      (map.getSource("mission_points") as GeoJSONSource | undefined)?.setData(geometry.points);
-      if (plan) {
-        const bounds = new LngLatBounds();
-        for (const cell of plan.cells) {
-          bounds.extend(offsetCoordinate(plan.center.latitude, plan.center.longitude, cell.north_m, cell.west_m));
-          bounds.extend(offsetCoordinate(plan.center.latitude, plan.center.longitude, cell.south_m, cell.east_m));
-        }
-        map.fitBounds(bounds, { padding: 48, duration: 500, maxZoom: 19 });
-      } else if (selected) {
-        map.easeTo({ center: [selected.longitude, selected.latitude], zoom: Math.max(map.getZoom(), 13), duration: 350 });
-      }
-    };
-    if (map.isStyleLoaded()) update();
-    else map.once("style.load", update);
-  }, [plan, selected]);
-
-  return <div ref={containerRef} className="min-h-[420px] flex-1" aria-label="Interactive terrain mission map" />;
+    const { boundary, home, focus } = current.current;
+    if (boundary.length > 1) {
+      const bounds = new LngLatBounds();
+      [...boundary, ...(home ? [home] : [])].forEach(point => bounds.extend(coordinates(point)));
+      map.fitBounds(bounds, { padding: 60, maxZoom: 20, duration: 300 });
+    } else map.easeTo({ center: coordinates(focus), zoom: 17, duration: 300 });
+  }, [props.fitVersion]);
+  return <div className="relative min-h-[420px] flex-1"><div ref={container} style={{ position: "absolute", inset: 0 }} aria-label="Survey area map" />
+    {error && <div role="status" className="absolute bottom-20 left-2 right-2 rounded bg-hud-bg/95 px-3 py-2 text-xs text-hud-muted sm:bottom-8">Some map tiles could not load. You can still enter boundary coordinates in Area.</div>}
+  </div>;
 }

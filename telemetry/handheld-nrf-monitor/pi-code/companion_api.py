@@ -4,6 +4,8 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import threading
+import time
+import uuid
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
@@ -45,6 +47,8 @@ class CompanionAPIServer:
 
 def _handler_for(mav_manager):
     mission_lock = threading.Lock()
+    plan_lock = threading.Lock()
+    plans = {}
 
     class CompanionRequestHandler(BaseHTTPRequestHandler):
         def do_OPTIONS(self) -> None:
@@ -61,6 +65,8 @@ def _handler_for(mav_manager):
                     "simulation": bool(mav_manager.simulate),
                     "connected": bool(telemetry.get("connected", False)),
                     "live_execution_enabled": False,
+                    "armed": bool(telemetry.get("armed", False)),
+                    "mission_state": telemetry.get("mission_state", "idle"),
                 })
                 return
             self._send_json(404, {"error": "endpoint not found"})
@@ -72,20 +78,43 @@ def _handler_for(mav_manager):
                 return
             try:
                 payload = self._read_json()
+                if path.endswith("simulate") and not mav_manager.simulate:
+                    self._send_json(403, {"error": "live Pixhawk execution is locked"})
+                    return
+                if "plan_id" in payload:
+                    self._start_reviewed_plan(payload)
+                    return
                 plan = _plan_from_payload(payload, mav_manager.get_telemetry_snapshot())
+                settings = plan.to_dict() if "search_area" in payload else payload
                 terrain = (
-                    sample_plan_terrain(plan, str(payload.get("surface_type", "water")))
-                    if payload.get("terrain_enabled", False)
+                    sample_plan_terrain(plan, str(settings.get("surface_type", "water")))
+                    if settings.get("terrain_enabled", False)
                     else {"status": "disabled", "used_for_clearance": False}
                 )
             except (ValueError, UnicodeError, json.JSONDecodeError) as exc:
                 self._send_json(400, {"error": str(exc)})
                 return
+            except ImportError:
+                self._send_json(503, {"error": "Install the Pi requirements.txt to enable polygon surveys"})
+                return
 
             if path == "/api/mission/plan":
                 plan_payload = plan.to_dict()
                 plan_payload["terrain"] = terrain
+                if plan_payload.get("schema_version") == 2:
+                    plan_payload["plan_id"] = uuid.uuid4().hex
+                    with plan_lock:
+                        expired = [key for key, (created, _) in plans.items() if time.monotonic() - created > 600]
+                        for key in expired:
+                            del plans[key]
+                        while len(plans) >= 16:
+                            del plans[next(iter(plans))]
+                        plans[plan_payload["plan_id"]] = (time.monotonic(), plan_payload)
                 self._send_json(200, {"status": "planned", "plan": plan_payload})
+                return
+
+            if "survey_options" in payload or "search_area" in payload:
+                self._send_json(400, {"error": "Generate and review a plan, then submit its plan_id and sortie_id"})
                 return
 
             if not mav_manager.simulate:
@@ -105,6 +134,9 @@ def _handler_for(mav_manager):
                 self._send_json(409, {"error": "another mission operation is in progress"})
                 return
             try:
+                if mav_manager.get_telemetry_snapshot().get("armed"):
+                    self._send_json(409, {"error": "Simulator is armed; finish the current flight first"})
+                    return
                 if not mav_manager.clear_all_missions():
                     self._send_json(500, {"error": "could not clear the simulated mission"})
                     return
@@ -117,6 +149,42 @@ def _handler_for(mav_manager):
                 plan_payload = plan.to_dict()
                 plan_payload["terrain"] = terrain
                 self._send_json(202, {"status": "simulation_started", "plan": plan_payload})
+            finally:
+                mission_lock.release()
+
+        def _start_reviewed_plan(self, payload):
+            if urlparse(self.path).path != "/api/mission/simulate":
+                raise ValueError("plan_id is only accepted for simulation")
+            if not isinstance(payload["plan_id"], str):
+                raise ValueError("plan_id must be a string")
+            with plan_lock:
+                cached = plans.get(payload["plan_id"])
+            if not cached or time.monotonic() - cached[0] > 600:
+                self._send_json(409, {"error": "Plan expired or API restarted; generate and review it again"})
+                return
+            plan = cached[1]
+            sortie = next((s for s in plan["sorties"] if s["sortie_id"] == payload.get("sortie_id")), None)
+            if not sortie:
+                raise ValueError("Select a valid sortie_id")
+            if not sortie["ready"]:
+                self._send_json(422, {"error": "Resolve the survey checks", "reasons": sortie["blocking_reasons"]})
+                return
+            if payload.get("review_confirmed") is not True:
+                raise ValueError("Confirm the selected route and relative-home altitude before simulation")
+            if not mission_lock.acquire(blocking=False):
+                self._send_json(409, {"error": "Another mission operation is in progress"})
+                return
+            try:
+                if mav_manager.get_telemetry_snapshot().get("armed"):
+                    self._send_json(409, {"error": "Simulator is armed; finish the current flight first"})
+                    return
+                if not mav_manager.clear_all_missions() or not mav_manager.upload_mission_items(sortie["mission_items"]):
+                    self._send_json(500, {"error": "Could not load the simulated mission"})
+                    return
+                if not mav_manager.set_arm(True) or not mav_manager.set_flight_mode("AUTO"):
+                    self._send_json(500, {"error": "Could not start the simulated mission"})
+                    return
+                self._send_json(202, {"status": "simulation_started", "plan": plan, "sortie_id": sortie["sortie_id"]})
             finally:
                 mission_lock.release()
 
@@ -154,6 +222,12 @@ def _handler_for(mav_manager):
 
 
 def _plan_from_payload(payload: Dict[str, Any], telemetry: Dict[str, Any]):
+    if "search_area" in payload:
+        from auto_grid_planner import build_radius_survey
+        return build_radius_survey(payload, telemetry)
+    if "survey_options" in payload:
+        from auto_grid_planner import build_auto_grid_mission
+        return build_auto_grid_mission(payload, telemetry)
     center = payload.get("center")
     if not isinstance(center, dict):
         raise ValueError("center must contain latitude and longitude")

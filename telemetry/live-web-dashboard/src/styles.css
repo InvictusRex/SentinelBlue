@@ -66,3 +66,18 @@ body {
     animation-iteration-count: 1 !important;
   }
 }
+/* Survey handles remain readable against aerial imagery and street maps. */
+.survey-vertex {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: #0f766e;
+  color: white;
+  font: 600 12px/1 monospace;
+  cursor: grab;
+  box-shadow: 0 1px 4px #0008;
+}
+.survey-vertex:focus-visible { outline: 3px solid #fbbf24; outline-offset: 2px; }

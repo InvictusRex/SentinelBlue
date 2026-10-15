@@ -251,6 +251,10 @@ class MAVLinkManager:
             print(f"[OK] Simulation: Loaded {len(items)} mission items into simulator memory.")
             with self._lock:
                 self.sim_mission_items = items
+                if items:
+                    self.sim_current_lat = items[0].get("x", 0) / 1e7
+                    self.sim_current_lon = items[0].get("y", 0) / 1e7
+                    self.sim_current_alt = 0.0
                 self.sim_mission_index = 1
                 self.state["mission_total_items"] = len(items)
                 self.state["mission_current_seq"] = 1
@@ -514,6 +518,7 @@ class MAVLinkManager:
                     self.state["battery_remaining"] = msg.battery_remaining
 
             elif msg_type == 'GLOBAL_POSITION_INT':
+                self.state["last_position_timestamp"] = now
                 self.state["latitude"] = round(msg.lat / 1e7, 7)
                 self.state["longitude"] = round(msg.lon / 1e7, 7)
                 self.state["altitude_relative"] = round(msg.relative_alt / 1000.0, 2)
@@ -523,6 +528,7 @@ class MAVLinkManager:
                     self.state["heading"] = heading
 
             elif msg_type == 'GPS_RAW_INT':
+                self.state["last_gps_timestamp"] = now
                 if msg.satellites_visible != 255:
                     self.state["satellites"] = msg.satellites_visible
                 fix_map = {0: "NO FIX", 1: "NO FIX", 2: "2D FIX", 3: "3D FIX", 4: "DGPS", 5: "RTK FLT", 6: "RTK FIX"}
@@ -729,6 +735,8 @@ class MAVLinkManager:
         self.sim_mission_index = 1
 
         EARTH_R = 6378137.0
+        survey_speed = 5.0
+        dwell_remaining = 0.0
 
         while self.running:
             time.sleep(0.1)
@@ -745,6 +753,7 @@ class MAVLinkManager:
             roll_actual = 0.0
             pitch_actual = 0.0
             climb_rate = 0.0
+            sim_ground_speed = 0.0
             mission_state = self.state.get("mission_state", "STANDBY")
             progress_pct = self.state.get("mission_progress_percent", 0)
 
@@ -771,6 +780,8 @@ class MAVLinkManager:
 
                 # 2. Speed Command (MAV_CMD_DO_CHANGE_SPEED = 178)
                 elif cmd in (178, 206):
+                    if cmd == 178 and item.get("param2", 0) > 0:
+                        survey_speed = item["param2"]
                     self.sim_mission_index += 1
 
                 # 3. Waypoint Command (MAV_CMD_NAV_WAYPOINT = 16)
@@ -791,28 +802,34 @@ class MAVLinkManager:
                     roll_actual = round(min(max(heading_err * 0.5, -20.0), 20.0), 2)
                     pitch_actual = -3.5 # Forward acceleration pitch
 
-                    # Step towards target at 5.0 m/s (0.5m per 0.1s tick)
-                    step_m = min(0.5, dist)
+                    step_m = min(survey_speed * 0.1, dist)
                     if dist > 0.01:
+                        sim_ground_speed = step_m / 0.1
                         sim_lat += (dlat / dist) * (step_m / EARTH_R) * (180.0 / math.pi)
                         sim_lon += (dlon / dist) * (step_m / (EARTH_R * math.cos(math.radians(sim_lat)))) * (180.0 / math.pi)
 
                     mission_state = f"NAV WP {self.sim_mission_index}/{total_wps - 1} ({dist:.1f}m)"
 
-                    # Reached Waypoint Acceptance Radius (2.0m)
-                    if dist <= 2.0:
-                        self.sim_mission_index += 1
+                    if dist <= 0.05:
+                        sim_lat, sim_lon, sim_alt = target_lat, target_lon, target_alt
+                        dwell_remaining += 0.1
+                        if dwell_remaining >= item.get("param1", 0):
+                            self.sim_mission_index += 1
+                            dwell_remaining = 0.0
 
                 # 4. Return to Launch / Land (MAV_CMD_NAV_RETURN_TO_LAUNCH = 20, MAV_CMD_NAV_LAND = 21)
                 elif cmd in (20, 21):
-                    dlat = (base_lat - sim_lat) * (math.pi / 180.0) * EARTH_R
-                    dlon = (base_lon - sim_lon) * (math.pi / 180.0) * EARTH_R * math.cos(math.radians(sim_lat))
+                    land_lat = item.get("x", 0) / 1e7 if cmd == 21 else base_lat
+                    land_lon = item.get("y", 0) / 1e7 if cmd == 21 else base_lon
+                    dlat = (land_lat - sim_lat) * (math.pi / 180.0) * EARTH_R
+                    dlon = (land_lon - sim_lon) * (math.pi / 180.0) * EARTH_R * math.cos(math.radians(sim_lat))
                     dist = math.sqrt(dlat**2 + dlon**2)
 
                     if dist > 2.0:
                         target_bearing = (math.degrees(math.atan2(dlon, dlat)) + 360.0) % 360.0
                         sim_heading = target_bearing
-                        step_m = min(0.5, dist)
+                        step_m = min(survey_speed * 0.1, dist)
+                        sim_ground_speed = step_m / 0.1
                         sim_lat += (dlat / dist) * (step_m / EARTH_R) * (180.0 / math.pi)
                         sim_lon += (dlon / dist) * (step_m / (EARTH_R * math.cos(math.radians(sim_lat)))) * (180.0 / math.pi)
                         mission_state = f"RTL RETURN ({dist:.1f}m)"
@@ -833,7 +850,7 @@ class MAVLinkManager:
                 self.sim_current_lon = sim_lon
                 self.sim_current_alt = sim_alt
 
-            elif is_auto and has_mission and self.sim_mission_index >= len(self.sim_mission_items):
+            elif has_mission and self.sim_mission_index >= len(self.sim_mission_items):
                 mission_state = "MISSION COMPLETED"
                 progress_pct = 100
 
@@ -845,6 +862,7 @@ class MAVLinkManager:
                 sim_heading = round((t * 12.0) % 360, 1)
                 roll_actual = round(3.5 * math.sin(t * 0.8), 2)
                 pitch_actual = round(2.0 * math.cos(t * 0.5), 2)
+                sim_ground_speed = 2.0
 
             gyro_x = round(5.0 * math.cos(t * 1.5), 2)
             gyro_y = round(4.0 * math.sin(t * 1.2), 2)
@@ -865,6 +883,8 @@ class MAVLinkManager:
             m2 = int(base_pwm - 35 * math.sin(t * 2.0))
             m3 = int(base_pwm + 40 * math.cos(t * 2.0))
             m4 = int(base_pwm - 30 * math.cos(t * 2.0))
+            if has_mission and not self.state.get("armed"):
+                m1 = m2 = m3 = m4 = 1000
 
             with self._lock:
                 self.state.update({
@@ -884,7 +904,7 @@ class MAVLinkManager:
                     "rc_rssi": int(92 + 5 * math.sin(t * 0.1)),
                     "radio_link_quality": 98,
                     "heading": round(sim_heading, 1),
-                    "ground_speed": 5.0 if is_auto and has_mission else 2.0,
+                    "ground_speed": round(sim_ground_speed, 2),
                     "mission_state": mission_state,
                     "mission_progress_percent": progress_pct,
                     "mission_current_seq": self.sim_mission_index,
@@ -907,6 +927,8 @@ class MAVLinkManager:
                     "motor_pwm": [m1, m2, m3, m4],
                     "motor_percent": [int((m - 1000) / 10.0) for m in [m1, m2, m3, m4]],
                     "last_packet_timestamp": time.time(),
+                    "last_position_timestamp": time.time(),
+                    "last_gps_timestamp": time.time(),
                     "last_heartbeat_timestamp": time.time(),
                     "last_message_type": "SIMULATION",
                     "mavlink_status": "Simulation telemetry running",
