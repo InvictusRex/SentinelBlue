@@ -1,8 +1,22 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+@import "maplibre-gl/dist/maplibre-gl.css";
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../../../autonomous-grid-search/web/src/assets/JetBrainsMono-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../../../autonomous-grid-search/web/src/assets/JetBrainsMono-SemiBold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+}
 
 html,
 body,
@@ -13,9 +27,18 @@ body,
 
 body {
   margin: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
   background-color: #080b10;
-  color: #e3eaf2;
+  color: #ffffff;
   -webkit-font-smoothing: antialiased;
+}
+
+::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+[class*="text-sig-"] {
+  color: #ffffff;
 }
 
 .tabular {
@@ -28,3 +51,50 @@ body {
     linear-gradient(to bottom, rgba(45, 212, 191, 0.04) 1px, transparent 1px);
   background-size: 48px 48px;
 }
+
+.maplibregl-map {
+  font: inherit;
+  background: #070b10;
+}
+
+.maplibregl-ctrl-group {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  background: #10161f;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.maplibregl-ctrl-group button {
+  background-color: #10161f;
+}
+
+.maplibregl-ctrl-attrib {
+  color: #334155;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+/* Survey handles remain readable against aerial imagery and street maps. */
+.survey-vertex {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: #0f766e;
+  color: white;
+  font: 600 12px/1 monospace;
+  cursor: grab;
+  box-shadow: 0 1px 4px #0008;
+}
+.survey-vertex:focus-visible { outline: 3px solid #fbbf24; outline-offset: 2px; }

@@ -1,11 +1,11 @@
 import { SatelliteDishIcon } from "lucide-react";
-import { Chip, Panel, Stat } from "./Panel";
+import { Chip, Panel, Stat } from "./panel";
 import type { NavState } from "../types/telemetry";
 
 function SignalBars({ rssi }: { rssi: number }) {
-  const level = rssi >= 75 ? 4 : rssi >= 50 ? 3 : rssi >= 25 ? 2 : rssi > 0 ? 1 : 0;
+  const level = rssi >= 80 ? 4 : rssi >= 60 ? 3 : rssi >= 40 ? 2 : rssi > 0 ? 1 : 0;
   return (
-    <div className="flex items-end gap-0.5" aria-hidden="true">
+    <div className="flex items-end gap-0.5" role="img" aria-label={`Radio signal ${rssi} percent`}>
       {[1, 2, 3, 4].map((i) => (
         <span
           key={i}
@@ -23,7 +23,7 @@ function Compass({ heading }: { heading: number }) {
       {["N", "E", "S", "W"].map((d, i) => (
         <span
           key={d}
-          className="absolute left-1/2 top-1 -translate-x-1/2 font-mono text-[7px] text-hud-faint"
+          className="absolute left-1/2 top-1 -translate-x-1/2 font-mono text-[10px] text-hud-faint"
           style={{ transform: `rotate(${i * 90}deg)`, transformOrigin: "50% 28px" }}
         >
           {d}
@@ -40,27 +40,27 @@ function Compass({ heading }: { heading: number }) {
   );
 }
 
-export function NavSignalBox({ nav, className }: { nav: NavState; className?: string }) {
+export function NavSignalBox({ nav, available, className }: { nav: NavState; available: boolean; className?: string }) {
   return (
     <Panel
       label="Navigation · Signal"
       icon={<SatelliteDishIcon size={12} />}
       meta={
         <>
-          <Chip tone="cyan">{nav.fix}</Chip>
-          <SignalBars rssi={nav.rssi} />
+          <Chip tone={available ? "cyan" : "amber"}>{available ? nav.fix : "NO DATA"}</Chip>
+          <SignalBars rssi={available ? nav.rssi : 0} />
         </>
       }
       className={className}
       bodyClassName="flex items-center gap-3"
     >
       <div className="grid min-w-0 flex-1 grid-cols-3 gap-x-3 gap-y-1.5">
-        <Stat label="Lat" value={nav.lat.toFixed(6)} />
-        <Stat label="Lon" value={nav.lon.toFixed(6)} />
-        <Stat label="Hdg" value={`${Math.round(nav.heading)}°`} />
-        <Stat label="Sats" value={nav.sats} tone={nav.sats >= 12 ? "text-sig-green" : "text-sig-amber"} />
-        <Stat label="HDOP" value={nav.hdop.toFixed(2)} tone={nav.hdop < 1.1 ? "text-hud-text" : "text-sig-amber"} />
-        <Stat label="RSSI" value={nav.rssi} unit="%" />
+        <Stat label="Lat" value={available ? nav.lat.toFixed(6) : "--"} />
+        <Stat label="Lon" value={available ? nav.lon.toFixed(6) : "--"} />
+        <Stat label="Hdg" value={available ? `${Math.round(nav.heading)}°` : "--"} />
+        <Stat label="Sats" value={available ? nav.sats : "--"} tone={available && nav.sats >= 12 ? "text-sig-green" : "text-sig-amber"} />
+        <Stat label="HDOP" value={available ? nav.hdop.toFixed(2) : "--"} tone={available && nav.hdop < 1.1 ? "text-hud-text" : "text-sig-amber"} />
+        <Stat label="RSSI" value={available ? nav.rssi : "--"} unit="%" />
       </div>
       <Compass heading={nav.heading} />
     </Panel>

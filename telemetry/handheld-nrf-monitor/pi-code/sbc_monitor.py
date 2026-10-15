@@ -46,7 +46,7 @@ class SBCMonitor:
                         return round(val / 1000.0, 1) if val > 1000 else round(val, 1)
                 except Exception:
                     pass
-        return 46.5
+        return 0.0
 
     def get_cpu_load(self) -> float:
         """Calculates instantaneous CPU load percentage."""

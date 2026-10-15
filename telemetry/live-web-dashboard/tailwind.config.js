@@ -9,9 +9,10 @@ export default {
           raise: "#141b24",
           line: "#1d2733",
           edge: "#27333f",
-          text: "#e3eaf2",
-          dim: "#8b9aab",
-          faint: "#5c6a7a"
+          text: "#ffffff",
+          muted: "#ffffff",
+          dim: "#ffffff",
+          faint: "#ffffff"
         },
         sig: {
           cyan: "#2dd4bf",
@@ -24,11 +25,13 @@ export default {
         }
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["JetBrains Mono", "ui-monospace", "monospace"],
         mono: ["JetBrains Mono", "ui-monospace", "monospace"]
       },
       fontSize: {
-        "2xs": ["10px", "12px"]
+        "2xs": ["14px", "20px"],
+        xs: ["15px", "22px"],
+        sm: ["16px", "24px"]
       }
     }
   },

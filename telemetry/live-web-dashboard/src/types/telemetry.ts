@@ -7,7 +7,7 @@ export interface BatteryState {
   total: number;
   percent: number;
   current: number;
-  consumed: number;
+  consumed: number | null;
   cells: CellReading[];
 }
 
@@ -41,14 +41,15 @@ export type LinkQuality = "OK" | "DEGRADED" | "LOST";
 
 export interface FlightState {
   mode: string;
-  armed: boolean;
-  failsafe: boolean;
+  armed: boolean | null;
+  failsafe: boolean | null;
   mission: string;
   wp: string;
   link: LinkQuality;
 }
 
 export interface SbcState {
+  available: boolean;
   cpu: number;
   cores: number[];
   memPercent: number;

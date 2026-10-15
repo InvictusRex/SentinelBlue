@@ -12,7 +12,7 @@ type PanelProps = {
 export function Panel({ label, icon, meta, className = "", bodyClassName = "", children }: PanelProps) {
   return (
     <section className={`flex min-w-0 flex-col rounded-md border border-hud-line bg-hud-panel ${className}`}>
-      <header className="flex h-8 shrink-0 items-center gap-1.5 border-b border-hud-line px-2.5">
+      <header className="flex h-9 shrink-0 items-center gap-1.5 border-b border-hud-line px-2.5">
         {icon ? <span className="text-hud-faint">{icon}</span> : null}
         <h2 className="truncate text-2xs font-semibold uppercase tracking-[0.14em] text-hud-dim">
           {label}
@@ -35,7 +35,7 @@ export function Stat({ label, value, unit, tone = "text-hud-text" }: StatProps) 
   return (
     <div className="min-w-0">
       <div className="truncate text-2xs uppercase tracking-[0.1em] text-hud-faint">{label}</div>
-      <div className={`tabular truncate font-mono text-[13px] font-medium leading-5 ${tone}`}>
+      <div className={`tabular truncate font-mono text-sm font-medium ${tone}`}>
         {value}
         {unit ? <span className="ml-0.5 text-2xs text-hud-faint">{unit}</span> : null}
       </div>
@@ -50,12 +50,12 @@ type ChipProps = {
 };
 
 const chipTones: Record<string, string> = {
-  neutral: "border-hud-edge bg-hud-raise text-hud-dim",
-  green: "border-sig-green/40 bg-sig-green/10 text-sig-green",
-  amber: "border-sig-amber/40 bg-sig-amber/10 text-sig-amber",
-  red: "border-sig-red/40 bg-sig-red/10 text-sig-red",
-  cyan: "border-sig-cyan/40 bg-sig-cyan/10 text-sig-cyan",
-  blue: "border-sig-blue/40 bg-sig-blue/10 text-sig-blue"
+  neutral: "border-hud-edge bg-hud-raise text-white",
+  green: "border-sig-green/40 bg-sig-green/10 text-white",
+  amber: "border-sig-amber/40 bg-sig-amber/10 text-white",
+  red: "border-sig-red/40 bg-sig-red/10 text-white",
+  cyan: "border-sig-cyan/40 bg-sig-cyan/10 text-white",
+  blue: "border-sig-blue/40 bg-sig-blue/10 text-white"
 };
 
 export function Chip({ children, tone = "neutral", className = "" }: ChipProps) {

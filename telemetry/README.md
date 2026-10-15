@@ -18,6 +18,9 @@ Entry point for the Raspberry Pi telemetry relay. It starts the MAVLink manager,
 ### `handheld-nrf-monitor/pi-code/mavlink_manager.py`
 Manages the Pixhawk MAVLink connection or simulator and keeps the shared telemetry state used by the NRF transmitter.
 
+### `handheld-nrf-monitor/pi-code/companion_mode.py`
+Evaluates the companion computer state from Pixhawk link freshness, battery, GPS, and Raspberry Pi temperature. It is monitor-only: every state has command output disabled, including `assist_ready` and `failsafe`.
+
 ### `handheld-nrf-monitor/pi-code/radio_tx_module.py`
 Packs selected telemetry into typed NRF24L01+ frames and broadcasts them to the ESP32 handheld receiver.
 
@@ -45,6 +48,25 @@ cd telemetry/handheld-nrf-monitor/pi-code
 python3 main.py --port /dev/serial0 --baud 115200 --radio-rate 5
 ```
 
+The default companion mode is `monitor`. To validate whether the system is
+healthy enough for a future assist feature without sending flight commands:
+
+```bash
+python3 main.py --simulate --no-radio --companion-mode assist
+```
+
+Companion states are:
+
+- `disabled` - state evaluation is disabled by configuration.
+- `monitor` - telemetry and companion health are current.
+- `assist_ready` - link, GPS, battery, and computer health checks passed. Flight command output remains disabled.
+- `degraded` - one or more required inputs are unavailable or outside the configured limits.
+- `failsafe` - a critical battery or temperature condition exists, or telemetry became stale while the aircraft was armed. This is a reported state; Pixhawk remains responsible for flight stabilization and configured vehicle failsafes.
+
+## Autonomous Grid Search
+
+Survey planning, the companion API, and the mission webpage are maintained in [autonomous-grid-search](../autonomous-grid-search/README.md). The Pi relay starts the planning API unless `--no-companion-api` is set. The telemetry dashboard displays ESP32 telemetry only.
+
 ## Running the Web Dashboard
 
 From `telemetry/live-web-dashboard` on the laptop or static-host machine:
@@ -54,7 +76,7 @@ npm ci
 npm run dev -- --host 0.0.0.0
 ```
 
-Open the dashboard URL and enter the ESP32 IP shown on the OLED. The dashboard reads:
+Open the dashboard URL, select the battery cell count, and enter the ESP32 IP shown on the OLED. The dashboard reads:
 
 ```text
 http://<esp-ip>/telemetry.json
@@ -69,9 +91,26 @@ npm run preview -- --host 0.0.0.0
 
 The Raspberry Pi does not serve the React dashboard in this telemetry flow.
 
-## Mission Control
+## Running the Web Dashboard with Docker
 
-Mission planning, grid-search, and `/api/mission/*` control endpoints are intentionally out of scope for this telemetry dashboard update. They should live in a separate mission-control module or PR so the telemetry relay remains focused on Pixhawk MAVLink input, NRF24 transmission, ESP32 JSON output, and laptop dashboard display.
+Install Docker Desktop with its Linux container backend, then run this from
+`telemetry/live-web-dashboard`:
+
+```bash
+docker compose up --build -d
+```
+
+The production build is served at `http://localhost:8080` on the Docker host.
+Other devices on the same network can use `http://<docker-host-ip>:8080` if the
+host firewall allows inbound TCP port 8080. Stop it with `docker compose down`.
+
+The dashboard reads `http://<esp-ip>/telemetry.json` directly from each viewer's
+browser during local use. A viewer must be able to reach the ESP32 on the same
+network. An HTTPS deployment requires a complete HTTPS
+telemetry endpoint because browsers block insecure HTTP telemetry requests from
+secure pages. Remote access requires an authenticated HTTPS or MQTT relay between
+the vehicle and dashboard; publishing Docker port 8080 does not make the ESP32
+endpoint reachable over the Internet.
 
 ## ESP32 Wi-Fi Credentials
 

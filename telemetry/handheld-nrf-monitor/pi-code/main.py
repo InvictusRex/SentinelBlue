@@ -15,10 +15,15 @@ import time
 import signal
 import argparse
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "autonomous-grid-search" / "backend"))
 
 from sbc_monitor import SBCMonitor
 from mavlink_manager import MAVLinkManager
 from radio_tx_module import RadioTXModule
+from companion_mode import CompanionModeController, RequestedCompanionMode
+from companion_api import CompanionAPIServer
 
 def main():
     parser = argparse.ArgumentParser(description="Drone Telemetry Pi Relay")
@@ -27,6 +32,14 @@ def main():
     parser.add_argument("--radio-rate", type=float, default=5.0, help="NRF24 broadcast rate in Hz (default: 5.0)")
     parser.add_argument("--no-radio", action="store_true", help="Disable NRF24 radio module")
     parser.add_argument("--simulate", action="store_true", help="Run simulated flight telemetry without hardware")
+    parser.add_argument(
+        "--companion-mode",
+        choices=[mode.value for mode in RequestedCompanionMode],
+        default=RequestedCompanionMode.MONITOR.value,
+        help="Companion state evaluation mode; assist only checks readiness and never sends commands",
+    )
+    parser.add_argument("--companion-api-port", type=int, default=8765, help="Mission planning API port")
+    parser.add_argument("--no-companion-api", action="store_true", help="Disable the mission planning API")
     args = parser.parse_args()
 
     print("=" * 76)
@@ -36,15 +49,22 @@ def main():
     print("[*] Web Dashboard:           laptop/static host reads ESP32 Wi-Fi JSON")
     print(f"[*] Radio TX Broadcast Rate: {args.radio_rate} Hz ({'DISABLED' if args.no_radio else 'ENABLED'})")
     print(f"[*] Operation Mode:          {'SIMULATION' if args.simulate else 'LIVE PIXHAWK'}")
+    print(f"[*] Companion Mode:          {args.companion_mode.upper()} (live command output disabled)")
     print("----------------------------------------------------------------------------")
 
     # 1. SBC Monitor
     sbc_monitor = SBCMonitor()
     print("[+] Initialized SBC Hardware & Thermal Monitor.")
 
+    companion_mode = CompanionModeController(RequestedCompanionMode(args.companion_mode))
+
     # 2. Shared MAVLink Manager
     mav_manager = MAVLinkManager(port=args.port, baud=args.baud, simulate=args.simulate)
     mav_manager.start()
+
+    companion_api = CompanionAPIServer(mav_manager, port=args.companion_api_port)
+    if not args.no_companion_api:
+        companion_api.start()
 
     # 3. NRF24 Radio Transmitter
     radio_module = RadioTXModule(
@@ -66,9 +86,10 @@ def main():
     # Graceful exit handler
     def shutdown(signum, frame):
         print("\n[*] Stopping telemetry relay...")
+        companion_api.stop()
         radio_module.stop()
         mav_manager.stop()
-        print("[✓] All modules stopped cleanly.")
+        print("[OK] All modules stopped cleanly.")
         sys.exit(0)
 
     signal.signal(signal.SIGINT, shutdown)
@@ -83,7 +104,8 @@ def main():
             last_print = now
             t = mav_manager.get_telemetry_snapshot()
             sbc = sbc_monitor.get_metrics_snapshot()
-            conn_status = "✓ LIVE" if t.get("connected") else "! WAITING"
+            companion_status = companion_mode.evaluate(t, sbc, now=now)
+            conn_status = "LIVE" if t.get("connected") else "! WAITING"
             v_bat = t.get('battery_voltage', 0.0)
             bat_str = f"{v_bat:5.2f}V" if v_bat > 0.5 else "USB 5V"
             print(f"[{conn_status}] Mode: {t.get('flight_mode'):<9} | "
@@ -93,7 +115,9 @@ def main():
                   f"Hdg: {t.get('heading', 0.0):5.1f}° | "
                   f"Alt: {t.get('altitude_relative', 0.0):4.1f}m | "
                   f"Sats: {t.get('satellites', 0):2d} | "
-                  f"CPU: {sbc.get('cpu_temp_c', 0.0):4.1f}°C")
+                  f"CPU: {sbc.get('cpu_temp_c', 0.0):4.1f}°C | "
+                  f"Companion: {companion_status.state.value.upper()} "
+                  f"({'; '.join(companion_status.reasons)})")
 
 if __name__ == "__main__":
     main()
