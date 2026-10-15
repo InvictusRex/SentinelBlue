@@ -864,9 +864,9 @@ class MAVLinkManager:
                 pitch_actual = round(2.0 * math.cos(t * 0.5), 2)
                 sim_ground_speed = 2.0
 
-            gyro_x = round(5.0 * math.cos(t * 1.5), 2)
-            gyro_y = round(4.0 * math.sin(t * 1.2), 2)
-            gyro_z = round(2.5 * math.sin(t * 0.4), 2)
+            gyro_x = round(9.0 * math.cos(t * 0.31) + 2.0 * math.sin(t * 0.09), 2)
+            gyro_y = round(7.0 * math.sin(t * 0.27 + 0.8), 2)
+            gyro_z = round(5.0 * math.sin(t * 0.19 + 1.6), 2)
 
             accel_x = round(0.4 * math.sin(t * 1.5), 2)
             accel_y = round(0.3 * math.cos(t * 1.2), 2)
@@ -878,11 +878,11 @@ class MAVLinkManager:
             c3 = round((sim_voltage / 3.0) + 0.002, 3)
             cell_delta = int((max(c1, c2, c3) - min(c1, c2, c3)) * 1000)
 
-            base_pwm = 1580
-            m1 = int(base_pwm + 45 * math.sin(t * 2.0))
-            m2 = int(base_pwm - 35 * math.sin(t * 2.0))
-            m3 = int(base_pwm + 40 * math.cos(t * 2.0))
-            m4 = int(base_pwm - 30 * math.cos(t * 2.0))
+            base_pwm = 1550 + 90 * math.sin(t * 0.12)
+            m1 = int(base_pwm + 35 + 45 * math.sin(t * 0.28))
+            m2 = int(base_pwm - 30 + 38 * math.sin(t * 0.21 + 1.3))
+            m3 = int(base_pwm + 15 + 40 * math.cos(t * 0.24 + 2.0))
+            m4 = int(base_pwm - 10 + 35 * math.cos(t * 0.18 + 0.8))
             if has_mission and not self.state.get("armed"):
                 m1 = m2 = m3 = m4 = 1000
 
@@ -920,10 +920,10 @@ class MAVLinkManager:
                     "attitude_yaw": round(sim_heading, 1),
                     "target_roll": 0.0,
                     "target_pitch": 0.0,
-                    "target_yaw": round(sim_heading, 1),
+                    "target_yaw": round((sim_heading + 1.2 * math.sin(t * 0.11)) % 360, 1),
                     "error_roll": round(-roll_actual, 2),
                     "error_pitch": round(-pitch_actual, 2),
-                    "error_yaw": 0.0,
+                    "error_yaw": round(1.2 * math.sin(t * 0.11), 2),
                     "motor_pwm": [m1, m2, m3, m4],
                     "motor_percent": [int((m - 1000) / 10.0) for m in [m1, m2, m3, m4]],
                     "last_packet_timestamp": time.time(),
